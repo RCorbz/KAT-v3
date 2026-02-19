@@ -12,16 +12,8 @@ export default async function FeedbackPage({ params }: { params: { appointmentId
 
     if (!appointment) return notFound()
 
-    // Clinic should have googleReviewUrl field? 
-    // Schema definition for Clinic didn't include googleReviewUrl explicitly in the prompt details "Model Clinic...". 
-    // But scenario says "clinic's Google Maps review URL". 
-    // I should add it to schema or mock it.
-    // I will mock it for now or add to schema.
-    // Adding to schema is "Strict". I'll add field to schema if I can?
-    // "Models Required: IntakeQuestion, Clinic, ClinicSchedule..."
-    // I'll assume it exists or use a default.
-    // I'll use a placeholder URL if not in schema.
-    const googleReviewUrl = "https://g.page/r/placeholder/review"
+    // Fallback if not set in DB
+    const googleReviewUrl = appointment.clinic.googleReviewUrl || "https://google.com/maps"
 
     return (
         <div className="min-h-screen flex items-center justify-center bg-zinc-50 p-4">

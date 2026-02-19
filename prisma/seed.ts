@@ -16,6 +16,7 @@ async function main() {
       zip: '76086',
       phone: '555-0100',
       isActive: true,
+      googleReviewUrl: "https://g.page/r/placeholder/review/weatherford",
     },
   })
 
@@ -32,6 +33,7 @@ async function main() {
       phone: '555-0200',
       isActive: false,
       openDate: new Date('2026-09-01'), // Fall 2026
+      googleReviewUrl: "https://g.page/r/placeholder/review/slc",
     },
   })
 
@@ -56,32 +58,30 @@ async function main() {
   }
 
   // 3. Seed Services
-  const dotPhysical = await prisma.service.upsert({
-    where: { id: 'service-dot-physical-weatherford' }, // Using fixed ID for idempotency check convenience or query by name/clinic combo if schema allowed unique constraint there. But schema has CUID. Let's find first or create.
-    // Actually upsert needs unique field. I didn't add unique constraint on Service(clinicId, name). 
-    // I should create them if not exist using findFirst. Or just use a deterministic ID logic for seeding if possible?
-    // CUIDs are random. I'll rely on finding by name for seeding logic or just use `create` if I can ensure clean slate? No, strict idempotency required.
-    // I will use `findFirst` then `create` if not found, or modify schema to have unique constraint on name+clinic.
-    // Let's modify logic here to be safe without schema change if possible, or just add unique constraint.
-    // Adding unique constraint is better practice. But for now I'll simulate upsert manually.
-    update: {}, 
-    create: {
-        // ...
-    }
-  })
-  // Wait, upsert REQUIRES unique field. I can't use it on non-unique.
-  // I will check if service exists.
-  
+
+
   const services = [
     { name: 'DOT Physical', price: 130, duration: 30, isUpsell: false },
     { name: 'Driver Tune-Up', price: 100, duration: 15, isUpsell: true },
   ]
 
   for (const s of services) {
+    // Check if service exists by name and clinicId to ensure idempotency
     const existing = await prisma.service.findFirst({
       where: { clinicId: weatherford.id, name: s.name }
     })
-    if (!existing) {
+
+    if (existing) {
+      await prisma.service.update({
+        where: { id: existing.id },
+        data: {
+          price: s.price,
+          duration: s.duration,
+          isUpsell: s.isUpsell,
+          description: s.isUpsell ? 'Boost your health' : 'Standard DOT Physical'
+        }
+      })
+    } else {
       await prisma.service.create({
         data: {
           clinicId: weatherford.id,
@@ -134,22 +134,21 @@ async function main() {
     { reviewerName: 'Mike R.', rating: 5, feedbackText: 'Booking was super easy from my truck.', isFeatured: true },
   ]
 
-  // We can't easy upsert reviews without a unique ID or key. I'll delete existing featured mock reviews and recreate them to ensure idempotency (or strict count).
-  // Or just check if count < 3.
+  // We can't easily upsert reviews without a unique ID or key. 
   const existingReviews = await prisma.review.count({ where: { isFeatured: true, reviewerName: { in: mockReviews.map(r => r.reviewerName) } } })
-  
+
   if (existingReviews === 0) {
-      for (const r of mockReviews) {
-        await prisma.review.create({
-            data: {
-                rating: r.rating,
-                feedbackText: r.feedbackText,
-                isFeatured: r.isFeatured,
-                reviewerName: r.reviewerName,
-                status: 'approved'
-            }
-        })
-      }
+    for (const r of mockReviews) {
+      await prisma.review.create({
+        data: {
+          rating: r.rating,
+          feedbackText: r.feedbackText,
+          isFeatured: r.isFeatured,
+          reviewerName: r.reviewerName,
+          status: 'approved'
+        }
+      })
+    }
   }
 
   console.log('Seeding completed.')

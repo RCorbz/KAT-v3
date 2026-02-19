@@ -30,6 +30,7 @@ model Clinic {
   zip         String
   phone       String
   isActive    Boolean          @default(true)
+  googleReviewUrl String?      // For Reputation Engine redirect
   openDate    DateTime?        // For "Fall 2026"
   
   schedules   ClinicSchedule[]

@@ -86,7 +86,7 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
         // Validate user details
         const { name, email, phone } = form.getValues()
         if (!name || !email || !phone) {
-            alert("Please fill in your details") // Replace with toast/sonner later
+            toast.error("Please fill in your details")
             return
         }
         setBookingStage('time')
@@ -128,7 +128,7 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
         } catch (e) {
             console.error(e)
             setIsSubmitting(false)
-            alert("Booking failed. Please try again.")
+            toast.error("Booking failed. Please try again.")
         }
     }
 

@@ -1,5 +1,5 @@
 import { plivoClient } from "@/lib/plivo"
-import plivo from "plivo"
+const plivo = require("plivo")
 import { NextResponse } from "next/server"
 
 export async function POST(req: Request) {
@@ -9,15 +9,24 @@ export async function POST(req: Request) {
     console.log("Plivo Webhook", action, Object.fromEntries(formData))
 
     if (!action) {
+        const proxyNumber = process.env.PLIVO_PROXY_NUMBER
+        const drBenNumber = process.env.DR_BEN_CELL_NUMBER
+        const appUrl = process.env.BETTER_AUTH_URL
+
+        if (!proxyNumber || !drBenNumber || !appUrl) {
+            console.error("Missing Plivo configuration")
+            return NextResponse.json({ error: "Configuration Error" }, { status: 500 })
+        }
+
         // Initial Call
         // Forward to Dr. Ben
         const response = new plivo.Response()
         const dial = response.addDial({
-            action: `${process.env.BETTER_AUTH_URL}/api/plivo/webhook/call?action=status`,
+            action: `${appUrl}/api/plivo/webhook/call?action=status`,
             method: "POST",
             redirect: true
         })
-        dial.addNumber(process.env.DR_BEN_CELL_NUMBER!)
+        dial.addNumber(drBenNumber)
 
         return new NextResponse(response.toXML(), {
             headers: { "Content-Type": "text/xml" }

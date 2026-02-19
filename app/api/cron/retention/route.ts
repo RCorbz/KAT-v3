@@ -37,7 +37,8 @@ export async function GET(req: Request) {
                     },
                     status: "completed"
                 },
-                include: { user: true }
+                include: { user: true },
+                take: 100 // Batch limit for scalability
             })
 
             console.log(`Campaign ${campaign.phaseName}: Found ${appointments.length} appointments from 2 years ago matching range.`)

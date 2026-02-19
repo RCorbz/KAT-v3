@@ -16,9 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { cn } from "@/lib/utils"
 import { CalendarIcon, Mic, Loader2 } from "lucide-react"
 import { createAppointment } from "./actions"
+import { toast } from "sonner"
 
 type Question = { id: string; text: string; jsonKey: string; type: string }
-type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean }
+type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string }
 type Clinic = { id: string; services: Service[]; schedules: any[] }
 
 export function BookingForm({ questions, clinic }: { questions: Question[], clinic: Clinic }) {
@@ -74,6 +75,7 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
         } catch (e) {
             console.error(e)
             setIsRecording(false)
+            toast.error("Voice intake failed. Please try again or type your answers.")
         }
     }
 
@@ -157,18 +159,18 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                                     <div className="flex gap-4">
                                         <Button
                                             type="button"
-                                            variant={form.watch(`answers.${q.jsonKey}`) === true ? "default" : "outline"}
-                                            onClick={() => form.setValue(`answers.${q.jsonKey}`, true)}
+                                            variant={form.watch(`answers.${q.jsonKey}` as any) === true ? "default" : "outline"}
+                                            onClick={() => form.setValue(`answers.${q.jsonKey}` as any, true)}
                                         >Yes</Button>
                                         <Button
                                             type="button"
-                                            variant={form.watch(`answers.${q.jsonKey}`) === false ? "default" : "outline"}
-                                            onClick={() => form.setValue(`answers.${q.jsonKey}`, false)}
+                                            variant={form.watch(`answers.${q.jsonKey}` as any) === false ? "default" : "outline"}
+                                            onClick={() => form.setValue(`answers.${q.jsonKey}` as any, false)}
                                         >No</Button>
                                     </div>
                                 ) : (
                                     <Input
-                                        {...form.register(`answers.${q.jsonKey}`)}
+                                        {...form.register(`answers.${q.jsonKey}` as any)}
                                         placeholder="Type or speak..."
                                     />
                                 )}

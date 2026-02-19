@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  phone         String?
+  role          String    @default("user") // "admin" or "user"
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  appointments  Appointment[]
+  reviews       Review[]
+  retentionLogs RetentionLog[]
+}
+
+model Clinic {
+  id          String           @id @default(cuid())
+  slug        String           @unique
+  name        String
+  address     String
+  city        String
+  state       String
+  zip         String
+  phone       String
+  isActive    Boolean          @default(true)
+  openDate    DateTime?        // For "Fall 2026"
+  
+  schedules   ClinicSchedule[]
+  services    Service[]        
+  appointments Appointment[]
+}
+
+model ClinicSchedule {
+  id        String   @id @default(cuid())
+  clinicId  String
+  clinic    Clinic   @relation(fields: [clinicId], references: [id])
+  dayOfWeek Int      // 0-6 (Sun-Sat)
+  openTime  String   // "09:00"
+  closeTime String   // "17:00"
+  isActive  Boolean  @default(true)
+
+  @@unique([clinicId, dayOfWeek])
+}
+
+model Service {
+  id          String   @id @default(cuid())
+  clinicId    String
+  clinic      Clinic   @relation(fields: [clinicId], references: [id])
+  name        String
+  description String?
+  price       Decimal
+  duration    Int      // In minutes
+  isUpsell    Boolean  @default(false)
+  
+  appointments Appointment[]
+}
+
+model IntakeQuestion {
+  id        String   @id @default(cuid())
+  text      String
+  jsonKey   String   @unique // e.g., "hasSleepApnea"
+  type      String   // "boolean", "text", "date"
+  isActive  Boolean  @default(true)
+  order     Int      @default(0)
+}
+
+model Appointment {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinicId    String
+  clinic      Clinic    @relation(fields: [clinicId], references: [id])
+  
+  services    Service[] 
+  
+  startTime   DateTime
+  endTime     DateTime
+  status      String    @default("booked") // "booked", "completed", "cancelled"
+  
+  reviews     Review[]
+}
+
+model CampaignSettings {
+  id              String   @id @default(cuid())
+  phaseName       String   @unique // "phase1", "phase2", "phase3"
+  triggerDays     Int      // 60, 30, 7
+  smsTemplate     String
+  isActive        Boolean  @default(true)
+}
+
+model RetentionLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  campaign      String   // "phase1", "phase2", "phase3"
+  sentAt        DateTime @default(now())
+  status        String   // "sent", "failed"
+  
+  @@unique([userId, campaign]) 
+}
+
+model Review {
+  id            String   @id @default(cuid())
+  appointmentId String?  // Optional because seeded reviews might not have real appointments
+  appointment   Appointment? @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  userId        String?  // Optional for seeded reviews
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating        Int
+  feedbackText  String?
+  aiTheme       String?
+  status        String   @default("pending") // "pending", "approved", "rejected"
+  isFeatured    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  reviewerName  String?  // For seeded reviews
+}

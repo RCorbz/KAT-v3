@@ -5,6 +5,7 @@ export const model = new Proxy({} as any, {
     get: (target, prop) => {
         const project = process.env.GOOGLE_CLOUD_PROJECT || 'kat-v3';
         const location = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
+        const modelName = process.env.GOOGLE_GEMINI_MODEL || 'gemini-2.5-flash';
 
         const vertexAI = new VertexAI({
             project,
@@ -17,7 +18,7 @@ export const model = new Proxy({} as any, {
             } : undefined
         });
         const generativeModel: any = vertexAI.getGenerativeModel({
-            model: 'gemini-2.5-flash',
+            model: modelName,
         });
         return typeof generativeModel[prop] === 'function'
             ? generativeModel[prop].bind(generativeModel)

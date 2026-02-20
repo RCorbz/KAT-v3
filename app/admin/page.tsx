@@ -1,9 +1,10 @@
 import { db } from "@/db"
 import { count, eq, and, gte, lte } from "drizzle-orm"
-import { services, appointments, reviews } from "@/db/schema"
+import { services, appointments, reviews, retentionLogs } from "@/db/schema"
 
 import { squareClient } from "@/lib/square"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
 import { format, addWeeks, startOfDay, endOfDay } from "date-fns"
 
 export const dynamic = 'force-dynamic'
@@ -115,11 +116,64 @@ async function getSentimentMetrics() {
     return { topPositives, topNegatives }
 }
 
+async function getRetentionMetrics() {
+    const allAppts = await db.select().from(appointments);
+    const allLogs = await db.select().from(retentionLogs);
+
+    const userAppts = new Map<string, typeof allAppts>();
+    allAppts.forEach(a => {
+        if (!userAppts.has(a.userId)) userAppts.set(a.userId, []);
+        userAppts.get(a.userId)!.push(a);
+    });
+
+    let firstTimeUsers = 0;
+    let returningUsers = 0;
+    let campaignDrivenAppointments = 0;
+
+    userAppts.forEach(appts => {
+        appts.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+        if (appts.length === 1) {
+            firstTimeUsers++;
+        } else if (appts.length > 1) {
+            returningUsers++;
+
+            const returningAppts = appts.slice(1);
+
+            returningAppts.forEach(ra => {
+                const hasAttribution = allLogs.some(log => {
+                    const daysDiff = (ra.startTime.getTime() - log.sentAt.getTime()) / (1000 * 60 * 60 * 24);
+                    return log.userId === ra.userId && daysDiff >= 0 && daysDiff <= 30;
+                });
+                if (hasAttribution) {
+                    campaignDrivenAppointments++;
+                }
+            });
+        }
+    });
+
+    const totalClients = firstTimeUsers + returningUsers;
+    const retentionRate = totalClients > 0 ? (returningUsers / totalClients) * 100 : 0;
+    const outreachConversionRate = allLogs.length > 0 ? (campaignDrivenAppointments / allLogs.length) * 100 : 0;
+
+    return {
+        totalClients,
+        firstTimeUsers,
+        returningUsers,
+        retentionRate,
+        campaignDrivenAppointments,
+        outreachConversionRate,
+        totalLogs: allLogs.length
+    };
+}
+
 export default async function AdminDashboard() {
     const aov = await getSquareAOV()
     const sentiment = await getSentimentMetrics()
-    // Mock retention rate for MVP or calculate
-    const retentionRate = 0.5
+    const rm = await getRetentionMetrics()
+
+    // Use actual retention rate for projections, fallback to industry avg (17%) if 0
+    const retentionRate = rm.retentionRate > 0 ? (rm.retentionRate / 100) : 0.17
 
     const weeks = [2, 4, 6]
     const projections = await Promise.all(weeks.map(async w => {
@@ -168,6 +222,63 @@ export default async function AdminDashboard() {
                         </CardContent>
                     </Card>
                 ))}
+            </div>
+
+            <h2 className="text-xl font-semibold mt-12 mb-6">Retention Intelligence</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-blue-100 bg-blue-50/10">
+                    <CardHeader>
+                        <CardTitle className="text-blue-800 text-lg flex items-center justify-between">
+                            Patient Mix
+                            {rm.retentionRate >= 17 ? (
+                                <Badge className="bg-emerald-500 hover:bg-emerald-600">Beating Industry Avg</Badge>
+                            ) : (
+                                <Badge variant="destructive">Below Industry Avg (17%)</Badge>
+                            )}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">First-Time vs. Returning Clients. Industry Benchmark: 17%.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                            <span className="font-semibold text-blue-700">First-Time Clients</span>
+                            <span className="text-sm rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-bold">{rm.firstTimeUsers} clients</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                            <span className="font-semibold text-blue-700">Returning "Patrons"</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-blue-900">{rm.retentionRate.toFixed(1)}%</span>
+                                <span className="text-sm rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-bold">{rm.returningUsers} clients</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-indigo-100 bg-indigo-50/10">
+                    <CardHeader>
+                        <CardTitle className="text-indigo-800 text-lg flex items-center justify-between">
+                            Campaign ROI
+                            {rm.outreachConversionRate >= 10 ? (
+                                <Badge className="bg-emerald-500 hover:bg-emerald-600">Healthy Conversion</Badge>
+                            ) : (
+                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-200">Needs Optimization</Badge>
+                            )}
+                        </CardTitle>
+                        <p className="text-xs text-muted-foreground">Appointments booked within 30 days of automated outreach. Goal: 10-15%.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
+                            <span className="font-semibold text-indigo-700">Outreach Sent</span>
+                            <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.totalLogs} logs</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
+                            <span className="font-semibold text-indigo-700">Campaign-Driven Apps</span>
+                            <div className="flex items-center gap-2">
+                                <span className="font-bold text-indigo-900">{rm.outreachConversionRate.toFixed(1)}%</span>
+                                <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.campaignDrivenAppointments} appts</span>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
 
             <h2 className="text-xl font-semibold mt-12 mb-6">Sentiment Intelligence</h2>

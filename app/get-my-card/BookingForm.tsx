@@ -27,7 +27,7 @@ const formSchema = z.object({
     upsellAccepted: z.boolean(),
     firstName: z.string().min(2, "First name is too short"),
     lastName: z.string().min(2, "Last name is too short"),
-    email: z.string().email("Please enter a valid email address"),
+    email: z.string().email("Please enter a valid email address").regex(/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/, "Please enter a valid email domain (e.g. .com)"),
     phone: z.string().min(14, "Please enter a valid phone number")
 })
 

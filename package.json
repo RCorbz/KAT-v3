@@ -15,7 +15,6 @@
   "dependencies": {
     "@google-cloud/vertexai": "^1.10.0",
     "@hookform/resolvers": "^5.2.2",
-    "@neondatabase/serverless": "^1.0.2",
     "@sendgrid/mail": "^8.1.6",
     "@types/canvas-confetti": "^1.9.0",
     "@uploadthing/react": "^7.3.3",

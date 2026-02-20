@@ -218,3 +218,19 @@ export async function processFeedback(id: string, action: 'approve' | 'reject') 
     await db.update(reviews).set({ status: action === 'approve' ? 'approved' : 'rejected' }).where(eq(reviews.id, id))
     revalidatePath("/admin/reputation")
 }
+
+export async function autoTagReview(id: string, text: string) {
+    if (!text || text.trim().length === 0) return;
+    try {
+        const { model } = await import("@/lib/vertex");
+        const prompt = `Analyze the following customer review and categorize the primary sentiment or reason into a single 1-2 word phrase (e.g., "Wait Time", "Staff", "Speed", "Professionalism", "Pricing"). If it's a mix, pick the most dominant one. Do not output anything else but the category phrase.\n\nReview: "${text}"`;
+        const res = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] });
+        const theme = res.response?.candidates?.[0]?.content?.parts?.[0]?.text?.trim().replace(/['"]/g, '');
+        if (theme) {
+            await db.update(reviews).set({ aiTheme: theme }).where(eq(reviews.id, id));
+        }
+    } catch (e) {
+        console.error("Failed to auto-tag review:", e);
+    }
+}
+

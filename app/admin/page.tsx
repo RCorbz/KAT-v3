@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { count, eq, and, gte, lte } from "drizzle-orm"
-import { services, appointments } from "@/db/schema"
+import { services, appointments, reviews } from "@/db/schema"
 
 import { squareClient } from "@/lib/square"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -87,8 +87,37 @@ async function getDueUsersCount(weeks: number) {
     return result[0].value
 }
 
+async function getSentimentMetrics() {
+    const allReviews = await db.select().from(reviews)
+
+    const posCounts: Record<string, number> = {}
+    const negCounts: Record<string, number> = {}
+
+    allReviews.forEach(r => {
+        if (!r.aiTheme) return;
+        if (r.rating === 5) {
+            posCounts[r.aiTheme] = (posCounts[r.aiTheme] || 0) + 1
+        } else {
+            negCounts[r.aiTheme] = (negCounts[r.aiTheme] || 0) + 1
+        }
+    })
+
+    const topPositives = Object.entries(posCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([theme, count]) => ({ theme, count }))
+
+    const topNegatives = Object.entries(negCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([theme, count]) => ({ theme, count }))
+
+    return { topPositives, topNegatives }
+}
+
 export default async function AdminDashboard() {
     const aov = await getSquareAOV()
+    const sentiment = await getSentimentMetrics()
     // Mock retention rate for MVP or calculate
     const retentionRate = 0.5
 
@@ -139,6 +168,39 @@ export default async function AdminDashboard() {
                         </CardContent>
                     </Card>
                 ))}
+            </div>
+
+            <h2 className="text-xl font-semibold mt-12 mb-6">Sentiment Intelligence</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card className="border-emerald-100 bg-emerald-50/10">
+                    <CardHeader>
+                        <CardTitle className="text-emerald-800 text-lg">Top 3 Conversion Drivers</CardTitle>
+                        <p className="text-xs text-muted-foreground">Highest frequency terms in 5-star reviews.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {sentiment.topPositives.length > 0 ? sentiment.topPositives.map((item: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100 shadow-sm">
+                                <span className="font-semibold text-emerald-700">{item.theme}</span>
+                                <span className="text-sm rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 font-bold">{item.count} Mentions</span>
+                            </div>
+                        )) : <p className="text-sm text-zinc-500 italic">No positive themes detected yet.</p>}
+                    </CardContent>
+                </Card>
+
+                <Card className="border-red-100 bg-red-50/10">
+                    <CardHeader>
+                        <CardTitle className="text-red-800 text-lg">Top 3 Friction Points</CardTitle>
+                        <p className="text-xs text-muted-foreground">Highest frequency terms in sub-5-star reviews.</p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {sentiment.topNegatives.length > 0 ? sentiment.topNegatives.map((item: any, i: number) => (
+                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-100 shadow-sm">
+                                <span className="font-semibold text-red-700">{item.theme}</span>
+                                <span className="text-sm rounded-full bg-red-100 text-red-800 px-3 py-1 font-bold">{item.count} Mentions</span>
+                            </div>
+                        )) : <p className="text-sm text-zinc-500 italic">No negative themes detected yet.</p>}
+                    </CardContent>
+                </Card>
             </div>
         </div>
     )

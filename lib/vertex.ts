@@ -17,7 +17,7 @@ export const model = new Proxy({} as any, {
             } : undefined
         });
         const generativeModel: any = vertexAI.getGenerativeModel({
-            model: 'gemini-1.5-flash',
+            model: 'gemini-2.5-flash',
         });
         return typeof generativeModel[prop] === 'function'
             ? generativeModel[prop].bind(generativeModel)

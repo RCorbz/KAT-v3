@@ -21,12 +21,15 @@ export async function createAppointment(formData: any) {
         await db.insert(users).values({
             id: userId,
             email: userDetails.email,
-            name: userDetails.name,
+            name: `${userDetails.firstName} ${userDetails.lastName}`.trim(),
             phone: userDetails.phone,
         })
     } else {
         // Update phone/name if changed?
-        await db.update(users).set({ name: userDetails.name, phone: userDetails.phone }).where(eq(users.id, userId))
+        await db.update(users).set({
+            name: `${userDetails.firstName} ${userDetails.lastName}`.trim(),
+            phone: userDetails.phone
+        }).where(eq(users.id, userId))
     }
 
     // 2. Resolve Services
@@ -90,5 +93,5 @@ export async function createAppointment(formData: any) {
     }
 
     revalidatePath("/get-my-card")
-    redirect("/get-my-card/success")
+    return { success: true, appointmentId }
 }

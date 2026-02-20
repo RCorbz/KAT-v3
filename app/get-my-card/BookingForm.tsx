@@ -17,6 +17,19 @@ import { cn } from "@/lib/utils"
 import { CalendarIcon, Mic, Loader2 } from "lucide-react"
 import { createAppointment } from "./actions"
 import { toast } from "sonner"
+import InputMask from "react-input-mask"
+import { useRouter } from "next/navigation"
+
+const formSchema = z.object({
+    answers: z.record(z.string(), z.any()).optional(),
+    date: z.date(),
+    timeSlot: z.string(),
+    upsellAccepted: z.boolean(),
+    firstName: z.string().min(2, "First name is too short"),
+    lastName: z.string().min(2, "Last name is too short"),
+    email: z.string().email("Please enter a valid email address"),
+    phone: z.string().min(14, "Please enter a valid phone number")
+})
 
 type Question = { id: string; text: string; jsonKey: string; type: string }
 type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string | null }
@@ -29,13 +42,16 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
     const [bookingStage, setBookingStage] = useState<'intake' | 'time' | 'review'>('intake')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
-    const form = useForm({
+    const router = useRouter()
+    const form = useForm<z.infer<typeof formSchema>>({
+        resolver: zodResolver(formSchema),
         defaultValues: {
             answers: {},
             date: new Date(),
             timeSlot: "",
             upsellAccepted: false,
-            name: "",
+            firstName: "",
+            lastName: "",
             email: "",
             phone: ""
         }
@@ -82,11 +98,10 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
     const baseService = clinic.services.find(s => !s.isUpsell)
     const upsellService = clinic.services.find(s => s.isUpsell)
 
-    const handleIntakeSubmit = () => {
-        // Validate user details
-        const { name, email, phone } = form.getValues()
-        if (!name || !email || !phone) {
-            toast.error("Please fill in your details")
+    const handleIntakeSubmit = async () => {
+        const isValid = await form.trigger(["firstName", "lastName", "email", "phone"])
+        if (!isValid) {
+            toast.error("Please fill in your valid details")
             return
         }
         setBookingStage('time')
@@ -109,22 +124,29 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
 
     const handleFinalSubmit = async () => {
         setIsSubmitting(true)
+        const vals = form.getValues()
         const data = {
-            answers: form.getValues().answers,
+            answers: vals.answers,
             date: selectedDate,
-            timeSlot: form.getValues().timeSlot,
-            upsellAccepted: form.getValues().upsellAccepted,
+            timeSlot: vals.timeSlot,
+            upsellAccepted: vals.upsellAccepted,
             userDetails: {
-                name: form.getValues().name,
-                email: form.getValues().email,
-                phone: form.getValues().phone
+                firstName: vals.firstName,
+                lastName: vals.lastName,
+                email: vals.email,
+                phone: vals.phone
             },
             clinicId: clinic.id
         }
 
         try {
-            await createAppointment(data)
-            // Redirect handled in server action
+            const res = await createAppointment(data)
+            if (res?.error) {
+                toast.error(res.error)
+                setIsSubmitting(false)
+            } else if (res?.success) {
+                router.push("/get-my-card/success")
+            }
         } catch (e) {
             console.error(e)
             setIsSubmitting(false)
@@ -180,18 +202,31 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
 
                     <div className="space-y-4 pt-4 border-t">
                         <h3 className="font-semibold">Your Details</h3>
-                        <div className="grid gap-4">
+                        <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2">
-                                <Label>Full Name</Label>
-                                <Input {...form.register("name")} placeholder="John Doe" />
+                                <Label>First Name</Label>
+                                <Input {...form.register("firstName")} placeholder="John" />
+                                {form.formState.errors.firstName && <p className="text-sm text-red-500">{form.formState.errors.firstName.message}</p>}
                             </div>
                             <div className="space-y-2">
+                                <Label>Last Name</Label>
+                                <Input {...form.register("lastName")} placeholder="Doe" />
+                                {form.formState.errors.lastName && <p className="text-sm text-red-500">{form.formState.errors.lastName.message}</p>}
+                            </div>
+                            <div className="space-y-2 sm:col-span-2">
                                 <Label>Email</Label>
                                 <Input {...form.register("email")} type="email" placeholder="john@example.com" />
+                                {form.formState.errors.email && <p className="text-sm text-red-500">{form.formState.errors.email.message}</p>}
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-2 sm:col-span-2">
                                 <Label>Phone</Label>
-                                <Input {...form.register("phone")} type="tel" placeholder="(555) 555-5555" />
+                                <InputMask
+                                    mask="(999) 999-9999"
+                                    {...form.register("phone")}
+                                >
+                                    {(inputProps: any) => <Input {...inputProps} type="tel" placeholder="(555) 555-5555" />}
+                                </InputMask>
+                                {form.formState.errors.phone && <p className="text-sm text-red-500">{form.formState.errors.phone.message}</p>}
                             </div>
                         </div>
                     </div>
@@ -232,7 +267,7 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                             )}
                             <p><strong>Time:</strong> {selectedDate?.toDateString()} at {form.watch("timeSlot")}</p>
                             <p><strong>Total Duration:</strong> {baseService?.duration! + (form.watch("upsellAccepted") ? upsellService?.duration! : 0)} mins</p>
-                            <p><strong>Client:</strong> {form.watch("name")}</p>
+                            <p><strong>Client:</strong> {form.watch("firstName")} {form.watch("lastName")}</p>
                         </CardContent>
                     </Card>
                     <Button onClick={handleFinalSubmit} disabled={isSubmitting} className="w-full h-14 text-xl bg-green-600 hover:bg-green-700">

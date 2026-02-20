@@ -15,9 +15,9 @@
   "dependencies": {
     "@google-cloud/vertexai": "^1.10.0",
     "@hookform/resolvers": "^5.2.2",
+    "@react-input/mask": "^2.0.4",
     "@sendgrid/mail": "^8.1.6",
     "@types/canvas-confetti": "^1.9.0",
-    "@types/react-input-mask": "^3.0.6",
     "@uploadthing/react": "^7.3.3",
     "bcryptjs": "^3.0.3",
     "better-auth": "^1.4.18",
@@ -36,7 +36,6 @@
     "react-day-picker": "^9.13.2",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.71.1",
-    "react-input-mask": "^2.0.4",
     "sonner": "^2.0.7",
     "square": "^44.0.0",
     "tailwind-merge": "^3.5.0",

@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils"
 import { CalendarIcon, Mic, Loader2 } from "lucide-react"
 import { createAppointment } from "./actions"
 import { toast } from "sonner"
-import InputMask from "react-input-mask"
+import { InputMask } from "@react-input/mask"
 import { useRouter } from "next/navigation"
 
 const formSchema = z.object({
@@ -221,11 +221,13 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                             <div className="space-y-2 sm:col-span-2">
                                 <Label>Phone</Label>
                                 <InputMask
-                                    mask="(999) 999-9999"
+                                    component={Input}
+                                    mask="(___) ___-____"
+                                    replacement={{ _: /\d/ }}
+                                    type="tel"
+                                    placeholder="(555) 555-5555"
                                     {...form.register("phone")}
-                                >
-                                    {(inputProps: any) => <Input {...inputProps} type="tel" placeholder="(555) 555-5555" />}
-                                </InputMask>
+                                />
                                 {form.formState.errors.phone && <p className="text-sm text-red-500">{form.formState.errors.phone.message}</p>}
                             </div>
                         </div>

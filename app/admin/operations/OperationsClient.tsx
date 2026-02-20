@@ -158,7 +158,7 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                             <div className="space-y-2"><Label>Zip</Label><Input name="zip" required placeholder="80202" className="bg-white" /></div>
                             <div className="space-y-2"><Label>Public Phone</Label><Input name="phone" required placeholder="(555) 555-5555" maxLength={14} className="bg-white" onChange={(e) => e.target.value = formatPhone(e.target.value)} /></div>
                             <div className="lg:col-span-3 pt-4">
-                                <Button type="submit" className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 h-11">Provision Database Instance</Button>
+                                <Button type="submit" className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 h-11">Create New Location</Button>
                             </div>
                         </form>
                     </CardContent>
@@ -419,8 +419,8 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                                             </SelectContent>
                                         </Select>
                                     </div>
-                                    <div className="w-full md:w-40 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Open Window</Label><Input name="openTime" type="time" required className="bg-white h-11" /></div>
-                                    <div className="w-full md:w-40 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Close Window</Label><Input name="closeTime" type="time" required className="bg-white h-11" /></div>
+                                    <div className="w-full md:w-40 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Open Window</Label><Input name="openTime" type="time" step="900" required className="bg-white h-11" /></div>
+                                    <div className="w-full md:w-40 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Close Window</Label><Input name="closeTime" type="time" step="900" required className="bg-white h-11" /></div>
                                     <Button type="submit" className="w-full md:w-auto bg-zinc-900 h-11 px-8 flex items-center gap-2"><PlusCircle className="w-4 h-4" /> Map Day</Button>
                                 </form>
 
@@ -439,9 +439,9 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                                                 })
                                             }} className="flex-1 flex flex-wrap items-center gap-4">
                                                 <div className="flex items-center gap-2 bg-zinc-50 p-1.5 rounded-lg border">
-                                                    <Input name="openTime" defaultValue={schedule.openTime} type="time" className="w-32 h-9 border-0 bg-transparent" />
+                                                    <Input name="openTime" defaultValue={schedule.openTime} type="time" step="900" className="w-32 h-9 border-0 bg-transparent" />
                                                     <span className="text-zinc-400 font-bold">»</span>
-                                                    <Input name="closeTime" defaultValue={schedule.closeTime} type="time" className="w-32 h-9 border-0 bg-transparent" />
+                                                    <Input name="closeTime" defaultValue={schedule.closeTime} type="time" step="900" className="w-32 h-9 border-0 bg-transparent" />
                                                 </div>
                                                 <div className="flex items-center gap-3 px-4 h-11 rounded-lg border bg-zinc-50 shadow-sm">
                                                     <Label className="text-[10px] uppercase font-black text-zinc-500 tracking-tighter">Status</Label>

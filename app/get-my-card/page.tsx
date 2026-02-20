@@ -4,8 +4,9 @@ import { notFound } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
 
-export default async function GetMyCardPage({ searchParams }: { searchParams: { clinic?: string } }) {
-    const clinicSlug = searchParams.clinic || "weatherford-tx" // Default to seed HQ
+export default async function GetMyCardPage({ searchParams }: { searchParams: Promise<{ clinic?: string }> | { clinic?: string } }) {
+    const resolvedParams = await searchParams
+    const clinicSlug = resolvedParams?.clinic || "weatherford-tx" // Default to seed HQ
 
     // Fetch active intake questions
     const questions = await prisma.intakeQuestion.findMany({
@@ -36,6 +37,14 @@ export default async function GetMyCardPage({ searchParams }: { searchParams: { 
         )
     }
 
+    const serializedClinic = {
+        ...clinic,
+        services: clinic.services.map(s => ({
+            ...s,
+            price: Number(s.price)
+        }))
+    }
+
     return (
         <div className="flex flex-col min-h-screen bg-background pb-20"> {/* pb-20 for bottom nav */}
             <header className="p-4 border-b bg-background sticky top-0 z-10">
@@ -46,7 +55,7 @@ export default async function GetMyCardPage({ searchParams }: { searchParams: { 
             <main className="flex-1 p-4">
                 <BookingForm
                     questions={questions}
-                    clinic={clinic}
+                    clinic={serializedClinic}
                 />
             </main>
         </div>

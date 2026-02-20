@@ -15,7 +15,7 @@ export default function SignInPage() {
     const [error, setError] = useState("")
 
     const handleSignIn = async () => {
-        await authClient.signIn.emailAndPassword({
+        await authClient.signIn.email({
             email,
             password
         }, {

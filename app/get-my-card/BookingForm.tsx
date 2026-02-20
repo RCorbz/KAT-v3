@@ -19,7 +19,7 @@ import { createAppointment } from "./actions"
 import { toast } from "sonner"
 
 type Question = { id: string; text: string; jsonKey: string; type: string }
-type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string }
+type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string | null }
 type Clinic = { id: string; services: Service[]; schedules: any[] }
 
 export function BookingForm({ questions, clinic }: { questions: Question[], clinic: Clinic }) {

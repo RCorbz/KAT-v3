@@ -43,20 +43,9 @@ export async function GET(req: Request) {
 
             console.log(`Campaign ${campaign.phaseName}: Found ${appointments.length} appointments from 2 years ago matching range.`)
 
-            for (const appt of appointments) {
+            await Promise.allSettled(appointments.map(async (appt) => {
                 const user = appt.user
-                if (!user.phone) continue
-
-                // Check for duplicate send
-                // This logic assumes "phase" is unique per user per cycle.
-                // If a user has multiple appointments, this might need refinement (e.g. check log date vs appt date).
-                // For MVP, simplistic check: has this user received this phase's message RECENTLY? 
-                // Or just ever? "Prevent duplicate sends in the same phase."
-                // I'll check if a log exists for this user + phase.
-                // If users renew every 2 years, we might want to allow sending again after 2 years.
-                // But `RetentionLog` is simple. I'll check if log exists.
-                // Better: check if log exists created > 1 year ago?
-                // For now, strict check.
+                if (!user.phone) return
 
                 const existingLog = await prisma.retentionLog.findFirst({
                     where: {
@@ -65,22 +54,19 @@ export async function GET(req: Request) {
                     }
                 })
 
-                if (existingLog) continue
+                if (existingLog) return
 
-                // Prepare SMS
                 const message = campaign.smsTemplate
                     .replace("{FirstName}", user.name || "Driver")
-                    .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card") // Mock URL
+                    .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
 
-                // Send SMS via Plivo
                 try {
                     await plivoClient.messages.create(
-                        process.env.PLIVO_PROXY_NUMBER!, // src
-                        user.phone, // dst
+                        process.env.PLIVO_PROXY_NUMBER!,
+                        user.phone,
                         message
                     )
 
-                    // Log it
                     await prisma.retentionLog.create({
                         data: {
                             userId: user.id,
@@ -92,7 +78,7 @@ export async function GET(req: Request) {
                 } catch (smsError) {
                     console.error(`Failed to send SMS to ${user.phone}`, smsError)
                 }
-            }
+            }))
         }
 
         return NextResponse.json({ success: true, sentCount })

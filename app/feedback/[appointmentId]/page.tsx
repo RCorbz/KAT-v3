@@ -3,10 +3,15 @@ import { FeedbackForm } from "@/components/FeedbackForm"
 import { notFound } from "next/navigation"
 
 export const dynamic = 'force-dynamic'
+export function generateStaticParams() { return []; }
 
-export default async function FeedbackPage({ params }: { params: { appointmentId: string } }) {
+export default async function FeedbackPage({ params }: { params: Promise<{ appointmentId: string }> | { appointmentId: string } }) {
+    // Next.js 15+ evaluates params as a Promise, await resolving it guarantees no undefined properties
+    const resolvedParams = await params
+    if (!resolvedParams?.appointmentId) return notFound()
+
     const appointment = await prisma.appointment.findUnique({
-        where: { id: params.appointmentId },
+        where: { id: resolvedParams.appointmentId },
         include: { clinic: true }
     })
 

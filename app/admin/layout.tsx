@@ -13,8 +13,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         redirect("/sign-in")
     }
 
-    // Role check - for MVP assuming any authenticated user is admin or check specific email/role
-    // if (session.user.role !== "admin") ...
+    // Role check - strict middleware implementation
+    if (session.user.role !== "admin") {
+        redirect("/sign-in")
+    }
 
     const navItems = [
         { href: "/admin", label: "Overview", icon: LayoutDashboard },

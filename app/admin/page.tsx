@@ -12,7 +12,7 @@ async function getSquareAOV() {
         thirtyDaysAgo.setDate(now.getDate() - 30)
 
         // Use proper ISO string format for Square API
-        const response = await squareClient.ordersApi.searchOrders({
+        const response = await squareClient.orders.search({
             locationIds: [], // Fetch all or specific if needed
             query: {
                 filter: {
@@ -29,20 +29,28 @@ async function getSquareAOV() {
             }
         })
 
-        const orders = response.result.orders || []
-        if (orders.length === 0) return 130 // Default fallback AOV
+        const orders = response.orders || []
+        if (orders.length === 0) {
+            const services = await prisma.service.findMany()
+            if (services.length > 0) {
+                return services.reduce((sum, s) => sum + Number(s.price), 0) / services.length
+            }
+            return 130 // Ultimate fallback
+        }
 
-        const totalRevenue = orders.reduce((sum, order) => {
+        const totalRevenue = orders.reduce((sum: number, order: any) => {
             return sum + Number(order.totalMoney?.amount || 0)
         }, 0)
 
-        // Square amount is in cents usually? Yes.
-        const totalRevenue dollars = totalRevenue / 100
+        const totalRevenue_dollars = totalRevenue / 100
 
         return totalRevenue_dollars / orders.length
     } catch (e) {
         console.error("Square API Error", e)
-        // Fallback: Average of Service prices?
+        const services = await prisma.service.findMany()
+        if (services.length > 0) {
+            return services.reduce((sum, s) => sum + Number(s.price), 0) / services.length
+        }
         return 130
     }
 }

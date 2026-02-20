@@ -1,6 +1,9 @@
 import { model } from "@/lib/vertex";
 import prisma from "@/lib/prisma";
+import { Buffer } from "buffer";
 import { NextResponse } from "next/server";
+
+export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
     try {
@@ -37,15 +40,22 @@ export async function POST(req: Request) {
       Return ONLY the JSON.
     `;
 
-        const result = await model.generateContent([
-            prompt,
-            {
-                inlineData: {
-                    mimeType: audioFile.type || "audio/webm",
-                    data: base64Audio,
+        const result = await model.generateContent({
+            contents: [
+                {
+                    role: 'user',
+                    parts: [
+                        { text: prompt },
+                        {
+                            inlineData: {
+                                mimeType: audioFile.type || "audio/webm",
+                                data: base64Audio,
+                            },
+                        },
+                    ],
                 },
-            },
-        ]);
+            ],
+        });
 
         const response = result.response;
         const text = response.candidates?.[0].content.parts[0].text;
@@ -61,6 +71,7 @@ export async function POST(req: Request) {
         return NextResponse.json(data);
     } catch (error) {
         console.error("Voice parsing error:", error);
-        return NextResponse.json({ error: "Failed to process audio" }, { status: 500 });
+        // Fallback for graceful degradation per Segment B
+        return NextResponse.json({ confidence: "low" }, { status: 200 });
     }
 }

@@ -1,8 +1,10 @@
-import prisma from "@/lib/prisma"
-import { plivoClient } from "@/lib/plivo"
-import { sendEmail } from "@/lib/email"
+import { db } from "@/db"
+import { eq, and, gte, lte } from "drizzle-orm"
+import { campaignSettings, appointments, retentionLogs } from "@/db/schema"
+
 import { NextResponse } from "next/server"
 import { addDays, startOfDay, endOfDay, subYears } from "date-fns"
+import { CommunicationService } from "@/lib/communication"
 
 export async function GET(req: Request) {
     // 1. Security Check
@@ -12,7 +14,7 @@ export async function GET(req: Request) {
     }
 
     try {
-        const campaigns = await prisma.campaignSettings.findMany({ where: { isActive: true } })
+        const campaigns = await db.select().from(campaignSettings).where(eq(campaignSettings.isActive, true))
         let sentCount = 0
 
         for (const campaign of campaigns) {
@@ -31,32 +33,29 @@ export async function GET(req: Request) {
             const endRange = endOfDay(targetLastApptDate)
 
             // Only pull appointments that matched this campaign's clinicId
-            const appointments = await prisma.appointment.findMany({
-                where: {
-                    clinicId: campaign.clinicId,
-                    startTime: {
-                        gte: startRange,
-                        lte: endRange
-                    },
-                    status: "completed"
-                },
-                include: { user: true },
-                take: 100 // Batch limit for scalability
+            const fetchedAppointments = await db.query.appointments.findMany({
+                where: and(
+                    eq(appointments.clinicId, campaign.clinicId),
+                    gte(appointments.startTime, startRange),
+                    lte(appointments.startTime, endRange),
+                    eq(appointments.status, "completed")
+                ),
+                with: { user: true },
+                limit: 100 // Batch limit for scalability
             })
 
-            console.log(`Campaign ${campaign.clinicId} - ${campaign.phaseName}: Found ${appointments.length} appointments from 2 years ago matching range.`)
+            console.log(`Campaign ${campaign.clinicId} - ${campaign.phaseName}: Found ${fetchedAppointments.length} appointments from 2 years ago matching range.`)
 
-            await Promise.allSettled(appointments.map(async (appt) => {
+            await Promise.allSettled(fetchedAppointments.map(async (appt: any) => {
                 const user = appt.user
+                if (!user) return
 
-                const existingLog = await prisma.retentionLog.findFirst({
-                    where: {
-                        userId: user.id,
-                        campaign: campaign.phaseName
-                    }
-                })
+                const existingLogs = await db.select().from(retentionLogs).where(and(
+                    eq(retentionLogs.userId, user.id),
+                    eq(retentionLogs.campaign, campaign.phaseName)
+                ))
 
-                if (existingLog) return
+                if (existingLogs.length > 0) return
 
                 let success = false;
 
@@ -66,12 +65,12 @@ export async function GET(req: Request) {
                         .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
 
                     try {
-                        await plivoClient.messages.create(
-                            process.env.PLIVO_PROXY_NUMBER!,
-                            user.phone,
-                            message
-                        )
-                        success = true;
+                        const smsRes = await CommunicationService.sendSms({
+                            to: user.phone,
+                            body: message,
+                            clinicId: campaign.clinicId
+                        });
+                        if (smsRes.success) success = true;
                     } catch (smsError) {
                         console.error(`Failed to send SMS to ${user.phone}`, smsError)
                     }
@@ -83,10 +82,11 @@ export async function GET(req: Request) {
                         .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
 
                     try {
-                        const emailResult = await sendEmail({
+                        const emailResult = await CommunicationService.sendEmail({
                             to: user.email,
                             subject: `Important Update from KAT Clinic (Phase: ${campaign.phaseName})`,
-                            html: htmlMessage
+                            html: htmlMessage,
+                            clinicId: campaign.clinicId
                         })
                         if (emailResult.success) {
                             success = true;
@@ -98,12 +98,11 @@ export async function GET(req: Request) {
 
                 if (success) {
                     try {
-                        await prisma.retentionLog.create({
-                            data: {
-                                userId: user.id,
-                                campaign: campaign.phaseName,
-                                status: "sent"
-                            }
+                        await db.insert(retentionLogs).values({
+                            id: crypto.randomUUID(),
+                            userId: user.id,
+                            campaign: campaign.phaseName,
+                            status: "sent"
                         })
                         sentCount++
                     } catch (logError) {

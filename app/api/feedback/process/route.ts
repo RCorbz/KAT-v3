@@ -1,5 +1,7 @@
 import { model } from "@/lib/vertex";
-import prisma from "@/lib/prisma";
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { appointments, reviews } from "@/db/schema"
 import { NextResponse } from "next/server";
 
 export const dynamic = 'force-dynamic';
@@ -35,24 +37,21 @@ export async function POST(req: Request) {
         // Save Review
         // We need to fetch Appointment to get User ID? Or just link to Appointment.
         // Schema links Review to Appointment and User.
-        const appointment = await prisma.appointment.findUnique({
-            where: { id: appointmentId },
-            select: { userId: true }
-        });
+        const appointmentRows = await db.select({ userId: appointments.userId }).from(appointments).where(eq(appointments.id, appointmentId))
+        const appointment = appointmentRows[0]
 
         if (!appointment) return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
 
-        const review = await prisma.review.create({
-            data: {
-                appointmentId,
-                userId: appointment.userId,
-                rating,
-                feedbackText,
-                aiTheme,
-                status: "pending", // Needs approval if < 5? or always? Prompt says "Surfaces it on /admin/reputation".
-                isFeatured: false // Only 5-star approved gets featured usually
-            }
-        });
+        await db.insert(reviews).values({
+            id: crypto.randomUUID(),
+            appointmentId,
+            userId: appointment.userId,
+            rating: rating.toString(),
+            feedbackText,
+            aiTheme,
+            status: "pending", // Needs approval if < 5? or always? Prompt says "Surfaces it on /admin/reputation".
+            isFeatured: false // Only 5-star approved gets featured usually
+        })
 
         return NextResponse.json({ success: true, aiTheme });
 

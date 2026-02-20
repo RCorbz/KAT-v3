@@ -1,4 +1,7 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { count, eq, and, gte, lte } from "drizzle-orm"
+import { services, appointments } from "@/db/schema"
+
 import { squareClient } from "@/lib/square"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { format, addWeeks, startOfDay, endOfDay } from "date-fns"
@@ -31,9 +34,9 @@ async function getSquareAOV() {
 
         const orders = response.orders || []
         if (orders.length === 0) {
-            const services = await prisma.service.findMany()
-            if (services.length > 0) {
-                return services.reduce((sum, s) => sum + Number(s.price), 0) / services.length
+            const allServices = await db.select().from(services)
+            if (allServices.length > 0) {
+                return allServices.reduce((sum, s) => sum + Number(s.price), 0) / allServices.length
             }
             return 130 // Ultimate fallback
         }
@@ -53,9 +56,9 @@ async function getSquareAOV() {
             console.warn("[Square API Fallback]:", msg);
         }
 
-        const services = await prisma.service.findMany()
-        if (services.length > 0) {
-            return services.reduce((sum, s) => sum + Number(s.price), 0) / services.length
+        const allServices = await db.select().from(services)
+        if (allServices.length > 0) {
+            return allServices.reduce((sum, s) => sum + Number(s.price), 0) / allServices.length
         }
         return 130
     }
@@ -74,16 +77,14 @@ async function getDueUsersCount(weeks: number) {
     const twoYearsAgoEnd = new Date(end)
     twoYearsAgoEnd.setFullYear(end.getFullYear() - 2)
 
-    const count = await prisma.appointment.count({
-        where: {
-            startTime: {
-                gte: twoYearsAgoStart,
-                lte: twoYearsAgoEnd
-            },
-            status: "completed"
-        }
-    })
-    return count
+    const result = await db.select({ value: count() }).from(appointments).where(
+        and(
+            gte(appointments.startTime, twoYearsAgoStart),
+            lte(appointments.startTime, twoYearsAgoEnd),
+            eq(appointments.status, "completed")
+        )
+    )
+    return result[0].value
 }
 
 export default async function AdminDashboard() {

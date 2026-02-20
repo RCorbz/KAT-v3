@@ -1,4 +1,6 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { reviews } from "@/db/schema"
+import { eq, desc } from "drizzle-orm"
 import { processFeedback } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
@@ -8,10 +10,14 @@ import { Check, X } from "lucide-react"
 export const dynamic = 'force-dynamic'
 
 export default async function ReputationPage() {
-    const pendingReviews = await prisma.review.findMany({
-        where: { status: "pending" },
-        include: { appointment: { include: { user: true } } },
-        orderBy: { createdAt: "desc" }
+    const pendingReviews = await db.query.reviews.findMany({
+        where: eq(reviews.status, "pending"),
+        with: {
+            appointment: {
+                with: { user: true }
+            }
+        },
+        orderBy: [desc(reviews.createdAt)]
     })
 
     return (

@@ -1,4 +1,6 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { appointments } from "@/db/schema"
 import { FeedbackForm } from "@/components/FeedbackForm"
 import { notFound } from "next/navigation"
 
@@ -10,10 +12,11 @@ export default async function FeedbackPage({ params }: { params: Promise<{ appoi
     const resolvedParams = await params
     if (!resolvedParams?.appointmentId) return notFound()
 
-    const appointment = await prisma.appointment.findUnique({
-        where: { id: resolvedParams.appointmentId },
-        include: { clinic: true }
+    const appointmentRows = await db.query.appointments.findMany({
+        where: eq(appointments.id, resolvedParams.appointmentId),
+        with: { clinic: true }
     })
+    const appointment = appointmentRows[0]
 
     if (!appointment) return notFound()
 

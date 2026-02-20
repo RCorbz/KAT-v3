@@ -1,19 +1,21 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { clinics } from "@/db/schema"
 import { RetentionCampaignsClient } from "./RetentionCampaignsClient"
 
 export const dynamic = 'force-dynamic'
 
 export default async function CampaignsPage() {
     // Fetch clinics with their campaigns ordered by triggerDays descending
-    const clinics = await prisma.clinic.findMany({
-        where: { isActive: true },
-        include: {
+    const dbClinics = await db.query.clinics.findMany({
+        where: eq(clinics.isActive, true),
+        with: {
             campaignSettings: {
-                orderBy: { triggerDays: 'desc' }
+                orderBy: (campaignSettings, { desc }) => [desc(campaignSettings.triggerDays)]
             }
         },
-        orderBy: { name: 'asc' }
+        orderBy: (clinics, { asc }) => [asc(clinics.name)]
     })
 
-    return <RetentionCampaignsClient clinics={clinics} />
+    return <RetentionCampaignsClient clinics={dbClinics} />
 }

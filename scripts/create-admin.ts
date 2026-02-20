@@ -1,6 +1,11 @@
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { users } from '../db/schema';
+import { eq } from 'drizzle-orm';
+
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
 
 async function main() {
     const email = "admin@kat-v3.com";
@@ -28,12 +33,12 @@ async function main() {
 
     // Update their role to "admin" 
     console.log(`Setting role field to "admin" within the database...`);
-    const updated = await prisma.user.updateMany({
-        where: { email },
-        data: { role: "admin" }
-    });
+    const resultSet = await db.update(users)
+        .set({ role: "admin" })
+        .where(eq(users.email, email))
+        .returning();
 
-    console.log(`Updated ${updated.count} user(s).`);
+    console.log(`Updated ${resultSet.length} user(s).`);
     console.log("\n=============================================");
     console.log(" ADMIN PROVISIONING COMPLETE");
     console.log("=============================================");
@@ -45,7 +50,6 @@ async function main() {
 
 main()
     .catch(console.error)
-    .finally(async () => {
-        await prisma.$disconnect();
+    .finally(() => {
         process.exit(0);
     });

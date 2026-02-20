@@ -1,4 +1,6 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { intakeQuestions, clinics, clinicSchedules, services } from "@/db/schema"
 import { BookingForm } from "./BookingForm"
 import { notFound } from "next/navigation"
 
@@ -9,25 +11,23 @@ export default async function GetMyCardPage({ searchParams }: { searchParams: Pr
     const clinicSlug = resolvedParams?.clinic || "weatherford-tx" // Default to seed HQ
 
     // Fetch active intake questions
-    const questions = await prisma.intakeQuestion.findMany({
-        where: { isActive: true },
-        orderBy: { order: "asc" },
+    const questions = await db.query.intakeQuestions.findMany({
+        where: eq(intakeQuestions.isActive, true),
+        orderBy: (intakeQuestions, { asc }) => [asc(intakeQuestions.order)],
     })
 
-    const clinic = await prisma.clinic.findUnique({
-        where: { slug: clinicSlug },
-        include: {
+    const clinicRow = await db.query.clinics.findFirst({
+        where: eq(clinics.slug, clinicSlug),
+        with: {
             schedules: true,
             services: true
         }
     })
+    const clinic = clinicRow
 
     // If clinic doesn't exist or isn't active (unless user is admin? No, public flow)
-    // Prompt: "SLC ... completely disable the booking flow"
     if (!clinic) return notFound()
 
-    // If inactive, maybe redirect to location page which shows "Coming Soon"?
-    // Or show "Coming Soon" here.
     if (!clinic.isActive) {
         return (
             <div className="flex flex-col items-center justify-center min-h-screen p-4 text-center">

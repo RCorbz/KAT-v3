@@ -1,4 +1,6 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { clinics } from "@/db/schema"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -8,10 +10,11 @@ import { MapPin, Phone, CalendarClock } from "lucide-react"
 export const dynamic = 'force-dynamic'
 
 export default async function LocationPage({ params }: { params: { slug: string } }) {
-    const clinic = await prisma.clinic.findUnique({
-        where: { slug: params.slug },
-        include: { schedules: true }
+    const clinicRows = await db.query.clinics.findMany({
+        where: eq(clinics.slug, params.slug),
+        with: { schedules: true }
     })
+    const clinic = clinicRows[0]
 
     if (!clinic) return notFound()
 

@@ -1,6 +1,12 @@
 import "dotenv/config";
 import { auth } from '../lib/auth';
-import prisma from '../lib/prisma';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { users } from '../db/schema';
+import { eq } from 'drizzle-orm';
+
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle(sql);
 
 async function main() {
     console.log("Updating password natively through BetterAuth to ensure hash format compatibility...");
@@ -15,9 +21,7 @@ async function main() {
 
     // Delete existing account and user so we can cleanly recreate using BetterAuth itself
     console.log("Cleaning up old raw-SQL records...");
-    await prisma.user.deleteMany({
-        where: { email }
-    });
+    await db.delete(users).where(eq(users.email, email));
 
     console.log("Delegating admin account creation to BetterAuth native API...");
     try {
@@ -37,10 +41,7 @@ async function main() {
     }
 
     console.log("Elevating user role to 'admin'...");
-    await prisma.user.update({
-        where: { email },
-        data: { role: 'admin' }
-    });
+    await db.update(users).set({ role: 'admin' }).where(eq(users.email, email));
 
     console.log("Done! You can now log in.");
 }

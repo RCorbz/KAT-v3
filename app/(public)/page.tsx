@@ -1,4 +1,6 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { reviews as reviewsSchema } from "@/db/schema"
 import { ReviewTicker } from "@/components/ReviewTicker"
 import Link from "next/link"
 import { Phone } from "lucide-react"
@@ -7,15 +9,12 @@ import { Button } from "@/components/ui/button"
 export const dynamic = 'force-dynamic' // Ensure fresh reviews
 
 export default async function HomePage() {
-    const reviews = await prisma.review.findMany({
-        where: { isFeatured: true },
-        select: {
-            id: true,
-            reviewerName: true,
-            rating: true,
-            feedbackText: true
-        }
-    })
+    const reviews = await db.select({
+        id: reviewsSchema.id,
+        reviewerName: reviewsSchema.reviewerName,
+        rating: reviewsSchema.rating,
+        feedbackText: reviewsSchema.feedbackText
+    }).from(reviewsSchema).where(eq(reviewsSchema.isFeatured, true))
 
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">

@@ -1,5 +1,8 @@
 import { model } from "@/lib/vertex";
-import prisma from "@/lib/prisma";
+import { db } from "@/db"
+import { eq } from "drizzle-orm"
+import { intakeQuestions } from "@/db/schema"
+
 import { Buffer } from "buffer";
 import { NextResponse } from "next/server";
 
@@ -19,9 +22,9 @@ export async function POST(req: Request) {
         const base64Audio = buffer.toString("base64");
 
         // Fetch active intake questions to guide the AI
-        const questions = await prisma.intakeQuestion.findMany({
-            where: { isActive: true },
-            orderBy: { order: "asc" },
+        const questions = await db.query.intakeQuestions.findMany({
+            where: eq(intakeQuestions.isActive, true),
+            orderBy: (intakeQuestions, { asc }) => [asc(intakeQuestions.order)],
         });
 
         const questionText = questions.map(q => `- ${q.text} (Key: ${q.jsonKey}, Type: ${q.type})`).join("\n");

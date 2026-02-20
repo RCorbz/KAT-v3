@@ -1,6 +1,8 @@
 "use server"
 
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
+import { eq, and, lt, gt, ne } from "drizzle-orm"
+import { users, clinics, services as servicesSchema, appointments, appointmentServices } from "@/db/schema"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -9,44 +11,43 @@ export async function createAppointment(formData: any) {
     const { answers, date, timeSlot, upsellAccepted, userDetails, clinicId } = formData
 
     // 1. Find or Create User
-    // For MVP, simplistic upsert by email. Real world needs auth or stronger check.
-    let user = await prisma.user.findUnique({ where: { email: userDetails.email } })
+    const existingUsers = await db.select().from(users).where(eq(users.email, userDetails.email))
+    let user = existingUsers[0]
+
+    let userId = user?.id
 
     if (!user) {
-        user = await prisma.user.create({
-            data: {
-                email: userDetails.email,
-                name: userDetails.name,
-                phone: userDetails.phone,
-            }
+        userId = crypto.randomUUID()
+        await db.insert(users).values({
+            id: userId,
+            email: userDetails.email,
+            name: userDetails.name,
+            phone: userDetails.phone,
         })
     } else {
         // Update phone/name if changed?
-        await prisma.user.update({
-            where: { id: user.id },
-            data: { name: userDetails.name, phone: userDetails.phone }
-        })
+        await db.update(users).set({ name: userDetails.name, phone: userDetails.phone }).where(eq(users.id, userId))
     }
 
     // 2. Resolve Services
-    const clinic = await prisma.clinic.findUnique({
-        where: { id: clinicId },
-        include: { services: true }
-    })
+    const clinicRows = await db.select().from(clinics).where(eq(clinics.id, clinicId))
+    const clinic = clinicRows[0]
 
     if (!clinic) throw new Error("Clinic not found")
 
-    const baseService = clinic.services.find(s => !s.isUpsell)
-    const upsellService = clinic.services.find(s => s.isUpsell)
+    const clinicServices = await db.select().from(servicesSchema).where(eq(servicesSchema.clinicId, clinicId))
 
-    const servicesToConnect = [{ id: baseService?.id! }]
+    const baseService = clinicServices.find(s => !s.isUpsell)
+    const upsellService = clinicServices.find(s => s.isUpsell)
+
+    const servicesToConnect = []
+    if (baseService) servicesToConnect.push({ id: baseService.id })
     if (upsellAccepted && upsellService) {
         servicesToConnect.push({ id: upsellService.id })
     }
 
     // 3. Create Appointment
     // Parse date and timeSlot to Date objects
-    // date is ISO string from JSON?
     const bookingDate = new Date(date)
     const [hours, minutes] = timeSlot.split(":").map(Number)
     const startTime = new Date(bookingDate)
@@ -56,42 +57,37 @@ export async function createAppointment(formData: any) {
     const endTime = new Date(startTime.getTime() + totalDuration * 60000)
 
     // Double booking check
-    const conflict = await prisma.appointment.findFirst({
-        where: {
-            clinicId: clinicId,
-            startTime: {
-                lt: endTime
-            },
-            endTime: {
-                gt: startTime
-            },
-            status: {
-                not: "cancelled"
-            }
-        }
-    })
+    const conflictSlots = await db.select().from(appointments).where(
+        and(
+            eq(appointments.clinicId, clinicId),
+            lt(appointments.startTime, endTime),
+            gt(appointments.endTime, startTime),
+            ne(appointments.status, "cancelled")
+        )
+    )
 
-    if (conflict) {
+    if (conflictSlots.length > 0) {
         return { error: "Slot already taken", status: 409 }
     }
 
-    await prisma.appointment.create({
-        data: {
-            userId: user.id,
-            clinicId: clinicId,
-            startTime,
-            endTime,
-            services: {
-                connect: servicesToConnect // M-N relation support
-            },
-            // Save intake answers? Schema doesn't have field for it.
-            // Maybe save as JSON in a new field or just rely on IntakeQuestion for UI?
-            // Prompt said "Auto-check the UI form boxes". 
-            // Usually we store the answers.
-            // I will assume for now we just create the appointment. 
-            // Ideally schema needs `intakeAnswers Json?`
-        }
+    const appointmentId = crypto.randomUUID()
+    await db.insert(appointments).values({
+        id: appointmentId,
+        userId: userId,
+        clinicId: clinicId,
+        startTime,
+        endTime,
+        status: "booked"
     })
+
+    if (servicesToConnect.length > 0) {
+        await db.insert(appointmentServices).values(
+            servicesToConnect.map(s => ({
+                appointmentId,
+                serviceId: s.id
+            }))
+        )
+    }
 
     revalidatePath("/get-my-card")
     redirect("/get-my-card/success")

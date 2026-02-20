@@ -1,15 +1,15 @@
-import prisma from "@/lib/prisma"
+import { db } from "@/db"
 import { OperationsClient } from "./OperationsClient"
 
 export default async function OperationsPage() {
-    const rawClinics = await prisma.clinic.findMany({
-        include: { services: true, schedules: true },
-        orderBy: { name: 'asc' }
+    const rawClinics = await db.query.clinics.findMany({
+        with: { services: true, schedules: true },
+        orderBy: (clinics, { asc }) => [asc(clinics.name)]
     })
 
     const clinics = rawClinics.map(clinic => ({
         ...clinic,
-        services: clinic.services.map(service => ({
+        services: clinic.services.map((service: any) => ({
             ...service,
             price: Number(service.price)
         }))

@@ -7,6 +7,7 @@ import {
     json,
     decimal,
     primaryKey,
+    unique,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -115,7 +116,7 @@ export const clinicSchedules = pgTable(
         isActive: boolean("isActive").default(true).notNull(),
     },
     (table) => ({
-        uniqueClinicDay: primaryKey({ columns: [table.clinicId, table.dayOfWeek] }),
+        uniqueClinicDay: unique("clinicSchedule_clinicId_dayOfWeek_unique").on(table.clinicId, table.dayOfWeek),
     })
 );
 
@@ -190,9 +191,7 @@ export const campaignSettings = pgTable(
         lastTestEmailAt: timestamp("lastTestEmailAt", { mode: "date" }),
     },
     (table) => ({
-        uniqueClinicPhase: primaryKey({
-            columns: [table.clinicId, table.phaseName],
-        }),
+        uniqueClinicPhase: unique("campaignSettings_clinicId_phaseName_unique").on(table.clinicId, table.phaseName),
     })
 );
 
@@ -208,7 +207,7 @@ export const retentionLogs = pgTable(
         status: text("status").notNull(),
     },
     (table) => ({
-        uniqueUserCampaign: primaryKey({ columns: [table.userId, table.campaign] }),
+        uniqueUserCampaign: unique("retentionLog_userId_campaign_unique").on(table.userId, table.campaign),
     })
 );
 

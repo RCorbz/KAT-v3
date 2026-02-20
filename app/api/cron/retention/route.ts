@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { plivoClient } from "@/lib/plivo"
+import { sendEmail } from "@/lib/email"
 import { NextResponse } from "next/server"
 import { addDays, startOfDay, endOfDay, subYears } from "date-fns"
 
@@ -29,8 +30,10 @@ export async function GET(req: Request) {
             const startRange = startOfDay(targetLastApptDate)
             const endRange = endOfDay(targetLastApptDate)
 
+            // Only pull appointments that matched this campaign's clinicId
             const appointments = await prisma.appointment.findMany({
                 where: {
+                    clinicId: campaign.clinicId,
                     startTime: {
                         gte: startRange,
                         lte: endRange
@@ -41,11 +44,10 @@ export async function GET(req: Request) {
                 take: 100 // Batch limit for scalability
             })
 
-            console.log(`Campaign ${campaign.phaseName}: Found ${appointments.length} appointments from 2 years ago matching range.`)
+            console.log(`Campaign ${campaign.clinicId} - ${campaign.phaseName}: Found ${appointments.length} appointments from 2 years ago matching range.`)
 
             await Promise.allSettled(appointments.map(async (appt) => {
                 const user = appt.user
-                if (!user.phone) return
 
                 const existingLog = await prisma.retentionLog.findFirst({
                     where: {
@@ -56,27 +58,58 @@ export async function GET(req: Request) {
 
                 if (existingLog) return
 
-                const message = campaign.smsTemplate
-                    .replace("{FirstName}", user.name || "Driver")
-                    .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
+                let success = false;
 
-                try {
-                    await plivoClient.messages.create(
-                        process.env.PLIVO_PROXY_NUMBER!,
-                        user.phone,
-                        message
-                    )
+                if (campaign.sendSms && user.phone) {
+                    const message = campaign.smsTemplate
+                        .replace("{FirstName}", user.name || "Driver")
+                        .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
 
-                    await prisma.retentionLog.create({
-                        data: {
-                            userId: user.id,
-                            campaign: campaign.phaseName,
-                            status: "sent"
+                    try {
+                        await plivoClient.messages.create(
+                            process.env.PLIVO_PROXY_NUMBER!,
+                            user.phone,
+                            message
+                        )
+                        success = true;
+                    } catch (smsError) {
+                        console.error(`Failed to send SMS to ${user.phone}`, smsError)
+                    }
+                }
+
+                if (campaign.sendEmail && user.email) {
+                    const htmlMessage = campaign.emailTemplate
+                        .replace("{FirstName}", user.name || "Driver")
+                        .replace("{attachmentUrl}", "https://kat-clinic.com/get-my-card")
+
+                    try {
+                        const emailResult = await sendEmail({
+                            to: user.email,
+                            subject: `Important Update from KAT Clinic (Phase: ${campaign.phaseName})`,
+                            html: htmlMessage
+                        })
+                        if (emailResult.success) {
+                            success = true;
                         }
-                    })
-                    sentCount++
-                } catch (smsError) {
-                    console.error(`Failed to send SMS to ${user.phone}`, smsError)
+                    } catch (emailError) {
+                        console.error(`Failed to send Email to ${user.email}`, emailError)
+                    }
+                }
+
+                if (success) {
+                    try {
+                        await prisma.retentionLog.create({
+                            data: {
+                                userId: user.id,
+                                campaign: campaign.phaseName,
+                                status: "sent"
+                            }
+                        })
+                        sentCount++
+                    } catch (logError) {
+                        // ignore unique constraint violation if fired concurrently
+                        console.error(`Failed to create retention log for ${user.id}`, logError)
+                    }
                 }
             }))
         }

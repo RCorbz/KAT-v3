@@ -45,8 +45,14 @@ async function getSquareAOV() {
         const totalRevenue_dollars = totalRevenue / 100
 
         return totalRevenue_dollars / orders.length
-    } catch (e) {
-        console.error("Square API Error", e)
+    } catch (e: any) {
+        // Silently catch Square API 401 Unauthorized errors (expected when locally testing without a real Square Token)
+        // Next.js dev server intercepts console.error and paints a full-screen red crash overlay, so we avoid it.
+        const msg = e?.message || "Unknown error";
+        if (!msg.includes("UNAUTHORIZED")) {
+            console.warn("[Square API Fallback]:", msg);
+        }
+
         const services = await prisma.service.findMany()
         if (services.length > 0) {
             return services.reduce((sum, s) => sum + Number(s.price), 0) / services.length

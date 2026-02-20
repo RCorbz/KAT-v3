@@ -120,14 +120,19 @@ async function main() {
 
   // 5. Seed Campaign Settings
   const campaigns = [
-    { phaseName: 'phase1', triggerDays: 60, smsTemplate: 'Hi {FirstName}, your DOT card expires in 60 days. Book now: {attachmentUrl}' },
-    { phaseName: 'phase2', triggerDays: 30, smsTemplate: 'Hi {FirstName}, 30 days left! Don\'t risk a violation. Book: {attachmentUrl}' },
-    { phaseName: 'phase3', triggerDays: 7, smsTemplate: 'URGENT {FirstName}: 7 days remaining. Call Dr. Ben immediately or book: {attachmentUrl}' },
+    { clinicId: weatherford.id, phaseName: 'phase1', triggerDays: 60, smsTemplate: 'Hi {FirstName}, your DOT card expires in 60 days. Book now: {attachmentUrl}' },
+    { clinicId: weatherford.id, phaseName: 'phase2', triggerDays: 30, smsTemplate: 'Hi {FirstName}, 30 days left! Don\'t risk a violation. Book: {attachmentUrl}' },
+    { clinicId: weatherford.id, phaseName: 'phase3', triggerDays: 7, smsTemplate: 'URGENT {FirstName}: 7 days remaining. Call Dr. Ben immediately or book: {attachmentUrl}' },
   ]
 
   for (const c of campaigns) {
     await prisma.campaignSettings.upsert({
-      where: { phaseName: c.phaseName },
+      where: {
+        clinicId_phaseName: {
+          clinicId: c.clinicId,
+          phaseName: c.phaseName
+        }
+      },
       update: {},
       create: c,
     })

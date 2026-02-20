@@ -14,20 +14,29 @@ export default function SignInPage() {
     const router = useRouter()
     const [error, setError] = useState("")
 
-    const handleSignIn = async () => {
-        await authClient.signIn.email({
-            email,
-            password
-        }, {
-            onSuccess: () => {
-                router.push("/admin")
-            },
-            onError: (ctx) => {
-                setError(ctx.error.message)
-            }
-        })
-    }
+    const [isLoading, setIsLoading] = useState(false)
 
+    const handleSignIn = async () => {
+        setError("")
+        setIsLoading(true)
+        try {
+            const { data, error } = await authClient.signIn.email({
+                email,
+                password
+            })
+
+            if (error) {
+                setError(error.message || "Failed to sign in")
+            } else {
+                // Force a hard navigation to bypass any client router cache issues
+                window.location.href = "/admin"
+            }
+        } catch (e: any) {
+            setError(e.message || "An unexpected error occurred")
+        } finally {
+            setIsLoading(false)
+        }
+    }
     return (
         <div className="flex items-center justify-center min-h-screen bg-zinc-100">
             <Card className="w-full max-w-sm">
@@ -52,7 +61,9 @@ export default function SignInPage() {
                         />
                     </div>
                     {error && <p className="text-red-500 text-sm">{error}</p>}
-                    <Button onClick={handleSignIn} className="w-full">Sign In</Button>
+                    <Button onClick={handleSignIn} disabled={isLoading} className="w-full">
+                        {isLoading ? "Signing in..." : "Sign In"}
+                    </Button>
                 </CardContent>
             </Card>
         </div>

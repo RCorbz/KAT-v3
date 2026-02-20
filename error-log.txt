@@ -1,0 +1,15 @@
+APIError: Failed to create user
+
+{
+  "status": "UNPROCESSABLE_ENTITY",
+  "body": {
+    "code": "FAILED_TO_CREATE_USER",
+    "message": "Failed to create user"
+  },
+  "headers": {},
+  "statusCode": 422,
+  "name": "APIError"
+}
+
+CAUSE:
+undefined

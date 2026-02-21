@@ -220,6 +220,7 @@ export async function processFeedback(id: string, action: 'approve' | 'reject') 
 }
 
 export async function autoTagReview(id: string, text: string) {
+    await checkAdmin();
     if (!text || text.trim().length === 0) return;
     try {
         const { model } = await import("@/lib/vertex");

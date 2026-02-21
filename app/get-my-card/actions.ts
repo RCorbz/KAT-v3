@@ -80,7 +80,8 @@ export async function createAppointment(formData: any) {
         clinicId: clinicId,
         startTime,
         endTime,
-        status: "booked"
+        status: "booked",
+        intakeAnswers: answers // Save the answers json!
     })
 
     if (servicesToConnect.length > 0) {

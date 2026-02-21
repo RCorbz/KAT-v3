@@ -190,6 +190,17 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                                             onClick={() => form.setValue(`answers.${q.jsonKey}` as any, false)}
                                         >No</Button>
                                     </div>
+                                ) : q.type === 'select' && q.jsonKey === 'howDidYouHear' ? (
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                        {...form.register(`answers.${q.jsonKey}` as any)}
+                                    >
+                                        <option value="">Select an option...</option>
+                                        <option value="Online Search">Online Search</option>
+                                        <option value="Ads / Social Media">Ads / Social Media</option>
+                                        <option value="Referral">Referral</option>
+                                        <option value="Other">Other</option>
+                                    </select>
                                 ) : (
                                     <Input
                                         {...form.register(`answers.${q.jsonKey}` as any)}

@@ -5,6 +5,7 @@ import { services, appointments, reviews, retentionLogs } from "@/db/schema"
 import { squareClient } from "@/lib/square"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format, addWeeks, startOfDay, endOfDay } from "date-fns"
 
 export const dynamic = 'force-dynamic'
@@ -130,8 +131,38 @@ async function getRetentionMetrics() {
     let returningUsers = 0;
     let campaignDrivenAppointments = 0;
 
+    let smsSent = 0;
+    let emailSent = 0;
+    let smsDriven = 0;
+    let emailDriven = 0;
+
+    const organicChannels: Record<string, number> = {
+        "Online Search": 0,
+        "Ads / Social Media": 0,
+        "Referral": 0,
+        "Other": 0
+    }
+
+    allLogs.forEach(log => {
+        if (log.campaign.toLowerCase().includes('email')) emailSent++;
+        else smsSent++;
+    })
+
     userAppts.forEach(appts => {
         appts.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+        if (appts.length >= 1) {
+            // Attribution on first appointment
+            const firstAppt = appts[0];
+            if (firstAppt.intakeAnswers && typeof firstAppt.intakeAnswers === 'object') {
+                const answer = (firstAppt.intakeAnswers as any).howDidYouHear;
+                if (answer && organicChannels[answer] !== undefined) {
+                    organicChannels[answer]++;
+                } else if (answer) {
+                    organicChannels["Other"]++;
+                }
+            }
+        }
 
         if (appts.length === 1) {
             firstTimeUsers++;
@@ -141,12 +172,24 @@ async function getRetentionMetrics() {
             const returningAppts = appts.slice(1);
 
             returningAppts.forEach(ra => {
+                let attributedToSms = false;
+                let attributedToEmail = false;
+
                 const hasAttribution = allLogs.some(log => {
                     const daysDiff = (ra.startTime.getTime() - log.sentAt.getTime()) / (1000 * 60 * 60 * 24);
-                    return log.userId === ra.userId && daysDiff >= 0 && daysDiff <= 30;
+                    const isInWindow = log.userId === ra.userId && daysDiff >= 0 && daysDiff <= 30;
+
+                    if (isInWindow) {
+                        if (log.campaign.toLowerCase().includes('email')) attributedToEmail = true;
+                        else attributedToSms = true;
+                    }
+                    return isInWindow;
                 });
+
                 if (hasAttribution) {
                     campaignDrivenAppointments++;
+                    if (attributedToSms) smsDriven++;
+                    if (attributedToEmail) emailDriven++;
                 }
             });
         }
@@ -156,6 +199,9 @@ async function getRetentionMetrics() {
     const retentionRate = totalClients > 0 ? (returningUsers / totalClients) * 100 : 0;
     const outreachConversionRate = allLogs.length > 0 ? (campaignDrivenAppointments / allLogs.length) * 100 : 0;
 
+    const smsConversionRate = smsSent > 0 ? (smsDriven / smsSent) * 100 : 0;
+    const emailConversionRate = emailSent > 0 ? (emailDriven / emailSent) * 100 : 0;
+
     return {
         totalClients,
         firstTimeUsers,
@@ -163,7 +209,14 @@ async function getRetentionMetrics() {
         retentionRate,
         campaignDrivenAppointments,
         outreachConversionRate,
-        totalLogs: allLogs.length
+        totalLogs: allLogs.length,
+        smsSent,
+        smsDriven,
+        smsConversionRate,
+        emailSent,
+        emailDriven,
+        emailConversionRate,
+        organicChannels
     };
 }
 
@@ -187,132 +240,197 @@ export default async function AdminDashboard() {
 
     return (
         <div className="space-y-8">
-            <h1 className="text-3xl font-bold">Business Intelligence</h1>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm font-medium text-muted-foreground">30-Day AOV</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">${aov.toFixed(2)}</div>
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm font-medium text-muted-foreground">Retention Baseline</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{(retentionRate * 100).toFixed(0)}%</div>
-                        <p className="text-xs text-muted-foreground">Historical 4-week avg</p>
-                    </CardContent>
-                </Card>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <h1 className="text-3xl font-bold">Business Intelligence</h1>
             </div>
 
-            <h2 className="text-xl font-semibold">Revenue Projections</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {projections.map(p => (
-                    <Card key={p.week}>
-                        <CardHeader>
-                            <CardTitle className="text-sm font-medium text-muted-foreground">{p.week}-Week Forecast</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">${p.revenue.toFixed(2)}</div>
-                            <p className="text-xs text-muted-foreground">{p.count} drivers due</p>
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
+            <Tabs defaultValue="revenue" className="w-full">
+                <TabsList className="grid w-full grid-cols-3 max-w-md h-auto p-1 bg-zinc-100 mb-8 rounded-lg overflow-hidden">
+                    <TabsTrigger value="revenue" className="py-2.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all">Revenue</TabsTrigger>
+                    <TabsTrigger value="retention" className="py-2.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all">Retention</TabsTrigger>
+                    <TabsTrigger value="reputation" className="py-2.5 text-sm data-[state=active]:bg-white data-[state=active]:shadow-sm rounded-md transition-all">Reputation</TabsTrigger>
+                </TabsList>
 
-            <h2 className="text-xl font-semibold mt-12 mb-6">Retention Intelligence</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-blue-100 bg-blue-50/10">
-                    <CardHeader>
-                        <CardTitle className="text-blue-800 text-lg flex items-center justify-between">
-                            Patient Mix
-                            {rm.retentionRate >= 17 ? (
-                                <Badge className="bg-emerald-500 hover:bg-emerald-600">Beating Industry Avg</Badge>
-                            ) : (
-                                <Badge variant="destructive">Below Industry Avg (17%)</Badge>
-                            )}
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground">First-Time vs. Returning Clients. Industry Benchmark: 17%.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
-                            <span className="font-semibold text-blue-700">First-Time Clients</span>
-                            <span className="text-sm rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-bold">{rm.firstTimeUsers} clients</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
-                            <span className="font-semibold text-blue-700">Returning "Patrons"</span>
-                            <div className="flex items-center gap-2">
-                                <span className="font-bold text-blue-900">{rm.retentionRate.toFixed(1)}%</span>
-                                <span className="text-sm rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-bold">{rm.returningUsers} clients</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                {/* --- REVENUE TAB --- */}
+                <TabsContent value="revenue" className="space-y-8 mt-0 animate-in fade-in-50 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">30-Day AOV</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">${aov.toFixed(2)}</div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm font-medium text-muted-foreground">Retention Baseline</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-2xl font-bold">{(retentionRate * 100).toFixed(0)}%</div>
+                                <p className="text-xs text-muted-foreground">Historical 4-week avg</p>
+                            </CardContent>
+                        </Card>
+                    </div>
 
-                <Card className="border-indigo-100 bg-indigo-50/10">
-                    <CardHeader>
-                        <CardTitle className="text-indigo-800 text-lg flex items-center justify-between">
-                            Campaign ROI
-                            {rm.outreachConversionRate >= 10 ? (
-                                <Badge className="bg-emerald-500 hover:bg-emerald-600">Healthy Conversion</Badge>
-                            ) : (
-                                <Badge variant="secondary" className="bg-orange-100 text-orange-800 hover:bg-orange-200">Needs Optimization</Badge>
-                            )}
-                        </CardTitle>
-                        <p className="text-xs text-muted-foreground">Appointments booked within 30 days of automated outreach. Goal: 10-15%.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
-                            <span className="font-semibold text-indigo-700">Outreach Sent</span>
-                            <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.totalLogs} logs</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
-                            <span className="font-semibold text-indigo-700">Campaign-Driven Apps</span>
-                            <div className="flex items-center gap-2">
-                                <span className="font-bold text-indigo-900">{rm.outreachConversionRate.toFixed(1)}%</span>
-                                <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.campaignDrivenAppointments} appts</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            </div>
+                    <h2 className="text-xl font-semibold">Revenue Projections</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {projections.map(p => (
+                            <Card key={p.week}>
+                                <CardHeader>
+                                    <CardTitle className="text-sm font-medium text-muted-foreground">{p.week}-Week Forecast</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-2xl font-bold">${p.revenue.toFixed(2)}</div>
+                                    <p className="text-xs text-muted-foreground">{p.count} drivers due</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                </TabsContent>
 
-            <h2 className="text-xl font-semibold mt-12 mb-6">Sentiment Intelligence</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <Card className="border-emerald-100 bg-emerald-50/10">
-                    <CardHeader>
-                        <CardTitle className="text-emerald-800 text-lg">Top 3 Conversion Drivers</CardTitle>
-                        <p className="text-xs text-muted-foreground">Highest frequency terms in 5-star reviews.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {sentiment.topPositives.length > 0 ? sentiment.topPositives.map((item: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100 shadow-sm">
-                                <span className="font-semibold text-emerald-700">{item.theme}</span>
-                                <span className="text-sm rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 font-bold">{item.count} Mentions</span>
-                            </div>
-                        )) : <p className="text-sm text-zinc-500 italic">No positive themes detected yet.</p>}
-                    </CardContent>
-                </Card>
+                {/* --- RETENTION TAB --- */}
+                <TabsContent value="retention" className="space-y-8 mt-0 animate-in fade-in-50 duration-500">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-                <Card className="border-red-100 bg-red-50/10">
-                    <CardHeader>
-                        <CardTitle className="text-red-800 text-lg">Top 3 Friction Points</CardTitle>
-                        <p className="text-xs text-muted-foreground">Highest frequency terms in sub-5-star reviews.</p>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        {sentiment.topNegatives.length > 0 ? sentiment.topNegatives.map((item: any, i: number) => (
-                            <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-100 shadow-sm">
-                                <span className="font-semibold text-red-700">{item.theme}</span>
-                                <span className="text-sm rounded-full bg-red-100 text-red-800 px-3 py-1 font-bold">{item.count} Mentions</span>
-                            </div>
-                        )) : <p className="text-sm text-zinc-500 italic">No negative themes detected yet.</p>}
-                    </CardContent>
-                </Card>
-            </div>
+                        {/* Organic Attribution */}
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold flex items-center justify-between">
+                                Organic Acquisition
+                                <Badge variant="outline" className="text-zinc-500">First-Time Only</Badge>
+                            </h2>
+                            <Card className="border-blue-100 bg-blue-50/10 h-full">
+                                <CardContent className="space-y-3 pt-6">
+                                    {Object.entries(rm.organicChannels).map(([key, val]) => (
+                                        <div key={key} className="flex justify-between items-center p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                                            <span className="font-semibold text-blue-700">{key}</span>
+                                            <span className="text-sm rounded-full bg-blue-100 text-blue-800 px-3 py-1 font-bold">{val} clients</span>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Patient Mix */}
+                        <div className="space-y-4">
+                            <h2 className="text-lg font-semibold flex items-center justify-between">
+                                Patient Mix
+                                {rm.retentionRate >= 17 ? (
+                                    <Badge className="bg-emerald-500 hover:bg-emerald-600">Beating Industry Avg</Badge>
+                                ) : (
+                                    <Badge variant="destructive">Below Industry Avg (17%)</Badge>
+                                )}
+                            </h2>
+                            <Card className="border-indigo-100 bg-indigo-50/10 h-full">
+                                <CardContent className="space-y-4 pt-6">
+                                    <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
+                                        <span className="font-semibold text-indigo-700">First-Time Clients</span>
+                                        <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.firstTimeUsers} clients</span>
+                                    </div>
+                                    <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-indigo-100 shadow-sm">
+                                        <span className="font-semibold text-indigo-700">Returning "Patrons"</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-indigo-900">{rm.retentionRate.toFixed(1)}%</span>
+                                            <span className="text-sm rounded-full bg-indigo-100 text-indigo-800 px-3 py-1 font-bold">{rm.returningUsers} clients</span>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                    </div>
+
+                    {/* Campaign Attribution Channels */}
+                    <h2 className="text-xl font-semibold mt-12 mb-4">Outreach Attribution</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+                        {/* SMS CARD */}
+                        <Card className="border-violet-100 bg-violet-50/10">
+                            <CardHeader>
+                                <CardTitle className="text-violet-800 text-lg flex items-center justify-between">
+                                    SMS Campaigns
+                                    {rm.smsConversionRate >= 15 ? <Badge className="bg-emerald-500">Overperforming</Badge> : rm.smsConversionRate >= 10 ? <Badge className="bg-emerald-500">Healthy</Badge> : <Badge variant="secondary" className="bg-orange-100 text-orange-800">Needs Optimization</Badge>}
+                                </CardTitle>
+                                <p className="text-xs text-muted-foreground">Appts booked within 30 days of text. Goal: 10-15%.</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-violet-100 shadow-sm">
+                                    <span className="font-semibold text-violet-700">Total SMS Sent</span>
+                                    <span className="text-sm rounded-full bg-violet-100 text-violet-800 px-3 py-1 font-bold">{rm.smsSent} messages</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-violet-100 shadow-sm">
+                                    <span className="font-semibold text-violet-700">Attributed Returns</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-violet-900">{rm.smsConversionRate.toFixed(1)}%</span>
+                                        <span className="text-sm rounded-full bg-violet-100 text-violet-800 px-3 py-1 font-bold">{rm.smsDriven} appts</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* EMAIL CARD */}
+                        <Card className="border-amber-100 bg-amber-50/10">
+                            <CardHeader>
+                                <CardTitle className="text-amber-800 text-lg flex items-center justify-between">
+                                    Email Campaigns
+                                    {rm.emailConversionRate >= 5 ? <Badge className="bg-emerald-500">Healthy</Badge> : <Badge variant="secondary" className="bg-orange-100 text-orange-800">Needs Optimization</Badge>}
+                                </CardTitle>
+                                <p className="text-xs text-muted-foreground">Appts booked within 30 days of email. Goal: 5%.</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-amber-100 shadow-sm">
+                                    <span className="font-semibold text-amber-700">Total Emails Sent</span>
+                                    <span className="text-sm rounded-full bg-amber-100 text-amber-800 px-3 py-1 font-bold">{rm.emailSent} messages</span>
+                                </div>
+                                <div className="flex justify-between items-center p-3 bg-white rounded-lg border border-amber-100 shadow-sm">
+                                    <span className="font-semibold text-amber-700">Attributed Returns</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="font-bold text-amber-900">{rm.emailConversionRate.toFixed(1)}%</span>
+                                        <span className="text-sm rounded-full bg-amber-100 text-amber-800 px-3 py-1 font-bold">{rm.emailDriven} appts</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                    </div>
+                </TabsContent>
+
+                {/* --- REPUTATION TAB --- */}
+                <TabsContent value="reputation" className="space-y-8 mt-0 animate-in fade-in-50 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card className="border-emerald-100 bg-emerald-50/10">
+                            <CardHeader>
+                                <CardTitle className="text-emerald-800 text-lg">Top 3 Conversion Drivers</CardTitle>
+                                <p className="text-xs text-muted-foreground">Highest frequency terms in 5-star reviews.</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {sentiment.topPositives.length > 0 ? sentiment.topPositives.map((item: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-emerald-100 shadow-sm">
+                                        <span className="font-semibold text-emerald-700">{item.theme}</span>
+                                        <span className="text-sm rounded-full bg-emerald-100 text-emerald-800 px-3 py-1 font-bold">{item.count} Mentions</span>
+                                    </div>
+                                )) : <p className="text-sm text-zinc-500 italic">No positive themes detected yet.</p>}
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-red-100 bg-red-50/10">
+                            <CardHeader>
+                                <CardTitle className="text-red-800 text-lg">Top 3 Friction Points</CardTitle>
+                                <p className="text-xs text-muted-foreground">Highest frequency terms in sub-5-star reviews.</p>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {sentiment.topNegatives.length > 0 ? sentiment.topNegatives.map((item: any, i: number) => (
+                                    <div key={i} className="flex items-center justify-between p-3 bg-white rounded-lg border border-red-100 shadow-sm">
+                                        <span className="font-semibold text-red-700">{item.theme}</span>
+                                        <span className="text-sm rounded-full bg-red-100 text-red-800 px-3 py-1 font-bold">{item.count} Mentions</span>
+                                    </div>
+                                )) : <p className="text-sm text-zinc-500 italic">No negative themes detected yet.</p>}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </TabsContent>
+
+            </Tabs>
         </div>
     )
 }

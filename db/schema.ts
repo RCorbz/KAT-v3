@@ -152,6 +152,7 @@ export const appointments = pgTable("appointment", {
     startTime: timestamp("startTime", { mode: "date" }).notNull(),
     endTime: timestamp("endTime", { mode: "date" }).notNull(),
     status: text("status").default("booked").notNull(),
+    intakeAnswers: json("intakeAnswers"),
 });
 
 // Many-to-Many between appointments and services

@@ -15,13 +15,22 @@ const checkAdmin = async () => {
     }
 }
 
-export async function updateService(id: string, data: { price: number, duration: number, isActive: boolean }) {
+export async function updateService(id: string, data: { name?: string, description?: string, price?: number, duration?: number, isUpsell?: boolean, showOnHomepage?: boolean, order?: number, type?: string }) {
     await checkAdmin()
-    await db.update(services).set({
-        price: data.price.toString(),
-        duration: data.duration,
-    }).where(eq(services.id, id))
-    revalidatePath("/admin/operations")
+
+    const updateData: any = {}
+    if (data.name !== undefined) updateData.name = data.name
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.price !== undefined) updateData.price = data.price.toString()
+    if (data.duration !== undefined) updateData.duration = data.duration
+    if (data.isUpsell !== undefined) updateData.isUpsell = data.isUpsell
+    if (data.showOnHomepage !== undefined) updateData.showOnHomepage = data.showOnHomepage
+    if (data.order !== undefined) updateData.order = data.order
+    if (data.type !== undefined) updateData.type = data.type
+
+    await db.update(services).set(updateData).where(eq(services.id, id))
+    revalidatePath("/admin")
+    revalidatePath("/")
 }
 
 export async function updateSchedule(id: string, data: { openTime: string, closeTime: string, isActive: boolean }) {
@@ -76,23 +85,29 @@ export async function updateClinicDoctorInfo(id: string, data: { doctorName?: st
     revalidatePath("/admin/operations")
 }
 
-export async function createService(data: { clinicId: string, name: string, price: number, duration: number, isUpsell: boolean }) {
+export async function createService(data: { clinicId: string, name: string, description?: string, price: number, duration: number, isUpsell: boolean, showOnHomepage?: boolean, order?: number, type?: string }) {
     await checkAdmin()
     await db.insert(services).values({
         id: crypto.randomUUID(),
         clinicId: data.clinicId,
         name: data.name,
+        description: data.description || null,
         price: data.price.toString(),
         duration: data.duration,
-        isUpsell: data.isUpsell
+        isUpsell: data.isUpsell,
+        showOnHomepage: data.showOnHomepage ?? true,
+        order: data.order ?? 0,
+        type: data.type ?? 'walkin'
     })
-    revalidatePath("/admin/operations")
+    revalidatePath("/admin")
+    revalidatePath("/")
 }
 
 export async function deleteService(id: string) {
     await checkAdmin()
     await db.delete(services).where(eq(services.id, id))
-    revalidatePath("/admin/operations")
+    revalidatePath("/admin")
+    revalidatePath("/")
 }
 
 export async function createSchedule(data: { clinicId: string, dayOfWeek: number, openTime: string, closeTime: string }) {

@@ -133,6 +133,9 @@ export const services = pgTable("service", {
     price: decimal("price").notNull(),
     duration: integer("duration").notNull(),
     isUpsell: boolean("isUpsell").default(false).notNull(),
+    showOnHomepage: boolean("showOnHomepage").default(true).notNull(),
+    order: integer("order").default(0).notNull(),
+    type: text("type").default("walkin").notNull(), // 'walkin' or 'reserved'
 });
 
 export const intakeQuestions = pgTable("intakeQuestion", {

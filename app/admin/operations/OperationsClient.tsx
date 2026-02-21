@@ -354,8 +354,7 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                                             <form action={async (formData) => {
                                                 await updateService(service.id, {
                                                     price: Number(formData.get("price")),
-                                                    duration: Number(formData.get("duration")),
-                                                    isActive: true
+                                                    duration: Number(formData.get("duration"))
                                                 })
                                             }} className="flex-1 grid grid-cols-1 md:grid-cols-4 items-end gap-4">
                                                 <div className="md:col-span-2 space-y-1">

@@ -261,3 +261,23 @@ export async function autoTagReview(id: string, text: string) {
     }
 }
 
+// Clinic Setting actions (Wait Time & Pricing)
+export async function updateClinicSettings(clinicId: string, data: { estimatedWaitMinutes?: number, walkInPrice?: number, reservedPrice?: number }) {
+    await checkAdmin();
+    try {
+        await db.update(clinics)
+            .set({
+                ...(data.estimatedWaitMinutes !== undefined && { estimatedWaitMinutes: data.estimatedWaitMinutes }),
+                ...(data.walkInPrice !== undefined && { walkInPrice: data.walkInPrice.toString() }),
+                ...(data.reservedPrice !== undefined && { reservedPrice: data.reservedPrice.toString() }),
+            })
+            .where(eq(clinics.id, clinicId));
+
+        revalidatePath('/');
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (e: any) {
+        console.error("Failed to update clinic settings:", e);
+        return { error: e.message };
+    }
+}

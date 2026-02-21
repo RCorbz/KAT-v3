@@ -43,23 +43,24 @@ export function ReviewTicker({ reviews }: { reviews: Review[] }) {
     const duplicatedReviews = [...reviews, ...reviews]
 
     return (
-        <div className="w-full overflow-hidden bg-zinc-900 py-2 border-b border-zinc-800">
+        <div className="w-full overflow-hidden bg-zinc-950 py-3 border-y border-zinc-900/50">
             <motion.div
                 ref={ref}
-                className="flex gap-8 whitespace-nowrap"
+                className="flex gap-12 whitespace-nowrap"
                 animate={controls}
                 initial={{ x: 0 }}
             >
                 {duplicatedReviews.map((review, i) => (
-                    <div key={`${review.id}-${i}`} className="flex items-center gap-2 text-white">
-                        <div className="flex">
-                            {[...Array(review.rating)].map((_, j) => (
-                                <Star key={j} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    <div key={`${review.id}-${i}`} className="flex items-center gap-3">
+                        <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, j) => (
+                                <Star key={j} className="h-3 w-3 fill-emerald-400 text-emerald-400" />
                             ))}
                         </div>
-                        <span className="font-medium text-sm">
-                            "{review.feedbackText}" - {review.reviewerName}
+                        <span className="font-bold text-[10px] tracking-tight text-zinc-300 uppercase">
+                            "{review.feedbackText}"
                         </span>
+                        <span className="text-[10px] font-black italic text-zinc-500">— {review.reviewerName}</span>
                     </div>
                 ))}
             </motion.div>

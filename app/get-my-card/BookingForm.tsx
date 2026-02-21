@@ -303,19 +303,32 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
             {bookingStage === 'review' && (
                 <div className="space-y-4">
                     <h2 className="text-lg font-semibold">Confirm Booking</h2>
-                    <Card>
-                        <CardContent className="pt-6 space-y-2">
-                            <p><strong>Service:</strong> {baseService?.name} (${String(baseService?.price)})</p>
+                    <Card className="border-blue-100 bg-blue-50/10">
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex justify-between items-center pb-4 border-b border-blue-100">
+                                <div>
+                                    <p className="font-bold text-blue-900">{baseService?.name}</p>
+                                    <p className="text-xs text-blue-600">Reserved Discount Applied</p>
+                                </div>
+                                <p className="text-xl font-black text-blue-900">${(clinic as any).reservedPrice || "99"}</p>
+                            </div>
+
                             {form.watch("upsellAccepted") && (
-                                <p className="text-green-600"><strong>+ {upsellService?.name}:</strong> ${String(upsellService?.price)}</p>
+                                <div className="flex justify-between items-center text-emerald-700">
+                                    <p className="font-semibold">+ {upsellService?.name}</p>
+                                    <p className="font-bold">${String(upsellService?.price)}</p>
+                                </div>
                             )}
-                            <p><strong>Time:</strong> {selectedDate?.toDateString()} at {form.watch("timeSlot")}</p>
-                            <p><strong>Total Duration:</strong> {baseService?.duration! + (form.watch("upsellAccepted") ? upsellService?.duration! : 0)} mins</p>
-                            <p><strong>Client:</strong> {form.watch("firstName")} {form.watch("lastName")}</p>
+
+                            <div className="space-y-1 text-sm text-zinc-600">
+                                <p><strong>When:</strong> {selectedDate?.toDateString()} at {form.watch("timeSlot")}</p>
+                                <p><strong>Duration:</strong> {baseService?.duration! + (form.watch("upsellAccepted") ? upsellService?.duration! : 0)} mins</p>
+                                <p><strong>Driver:</strong> {form.watch("firstName")} {form.watch("lastName")}</p>
+                            </div>
                         </CardContent>
                     </Card>
-                    <Button onClick={handleFinalSubmit} disabled={isSubmitting} className="w-full h-14 text-xl bg-green-600 hover:bg-green-700">
-                        {isSubmitting ? "Bookings..." : "Confirm Booking"}
+                    <Button onClick={handleFinalSubmit} disabled={isSubmitting} className="w-full h-14 text-xl bg-blue-600 hover:bg-blue-700 text-white font-black italic rounded-xl">
+                        {isSubmitting ? "PROCESSING..." : "CONFIRM & SAVE"}
                     </Button>
                 </div>
             )}

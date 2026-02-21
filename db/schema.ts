@@ -86,6 +86,9 @@ export const clinics = pgTable("clinic", {
     zip: text("zip").notNull(),
     phone: text("phone").notNull(),
     isActive: boolean("isActive").default(true).notNull(),
+    estimatedWaitMinutes: integer("estimatedWaitMinutes").default(0).notNull(),
+    walkInPrice: decimal("walkInPrice", { precision: 10, scale: 2 }).default("125.00").notNull(),
+    reservedPrice: decimal("reservedPrice", { precision: 10, scale: 2 }).default("99.00").notNull(),
     googleReviewUrl: text("googleReviewUrl"),
     openDate: timestamp("openDate", { mode: "date" }),
 

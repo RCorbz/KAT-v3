@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format, addWeeks, startOfDay, endOfDay } from "date-fns"
+import { ClinicSettingsManager } from "./ClinicSettingsManager"
+import { clinics } from "@/db/schema"
 
 export const dynamic = 'force-dynamic'
 
@@ -221,6 +223,10 @@ async function getRetentionMetrics() {
 }
 
 export default async function AdminDashboard() {
+    const headquarterClinic = await db.query.clinics.findFirst({
+        where: eq(clinics.slug, "weatherford-tx") // Using the main clinic for now
+    })
+
     const aov = await getSquareAOV()
     const sentiment = await getSentimentMetrics()
     const rm = await getRetentionMetrics()
@@ -243,6 +249,15 @@ export default async function AdminDashboard() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <h1 className="text-3xl font-bold">Business Intelligence</h1>
             </div>
+
+            {headquarterClinic && (
+                <ClinicSettingsManager
+                    clinicId={headquarterClinic.id}
+                    initialWaitTime={headquarterClinic.estimatedWaitMinutes || 0}
+                    initialWalkInPrice={headquarterClinic.walkInPrice || "125.00"}
+                    initialReservedPrice={headquarterClinic.reservedPrice || "99.00"}
+                />
+            )}
 
             <Tabs defaultValue="revenue" className="w-full">
                 <TabsList className="grid w-full grid-cols-3 max-w-md h-auto p-1 bg-zinc-100 mb-8 rounded-lg overflow-hidden">

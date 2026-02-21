@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { eq, and, lt, gt, ne } from "drizzle-orm"
-import { users, clinics, services as servicesSchema, appointments, appointmentServices } from "@/db/schema"
+import { eq, and, lt, gt, ne, gte, lte } from "drizzle-orm"
+import { users, clinics, services as servicesSchema, appointments, appointmentServices, clinicSchedules } from "@/db/schema"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
@@ -95,4 +95,70 @@ export async function createAppointment(formData: any) {
 
     revalidatePath("/get-my-card")
     return { success: true, appointmentId }
+}
+
+export async function getAvailableSlots(clinicId: string, date: Date, serviceDuration: number) {
+    // 1. Get schedule for day of week
+    const dayOfWeek = date.getDay()
+    const scheduleRows = await db.select().from(clinicSchedules).where(
+        and(
+            eq(clinicSchedules.clinicId, clinicId),
+            eq(clinicSchedules.dayOfWeek, dayOfWeek),
+            eq(clinicSchedules.isActive, true)
+        )
+    )
+    const schedule = scheduleRows[0]
+    if (!schedule) return []
+
+    // 2. Parse open/close times
+    const [openH, openM] = schedule.openTime.split(":").map(Number)
+    const [closeH, closeM] = schedule.closeTime.split(":").map(Number)
+
+    const startTime = new Date(date)
+    startTime.setHours(openH, openM, 0, 0)
+
+    const endTime = new Date(date)
+    endTime.setHours(closeH, closeM, 0, 0)
+
+    // 3. Get existing appointments for this day
+    const dayStart = new Date(date)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(date)
+    dayEnd.setHours(23, 59, 59, 999)
+
+    const existingAppointments = await db.select().from(appointments).where(
+        and(
+            eq(appointments.clinicId, clinicId),
+            gte(appointments.startTime, dayStart),
+            lte(appointments.endTime, dayEnd),
+            ne(appointments.status, "cancelled")
+        )
+    )
+
+    // 4. Generate slots (every 30 mins)
+    const slots: string[] = []
+    let current = new Date(startTime)
+
+    while (current.getTime() + serviceDuration * 60000 <= endTime.getTime()) {
+        const slotStart = new Date(current)
+        const slotEnd = new Date(current.getTime() + serviceDuration * 60000)
+
+        // Check for conflicts
+        const isConflict = existingAppointments.some(appt => {
+            return (slotStart < appt.endTime && slotEnd > appt.startTime)
+        })
+
+        if (!isConflict) {
+            slots.push(formatTime(current))
+        }
+
+        // Increment by 30 mins
+        current = new Date(current.getTime() + 30 * 60000)
+    }
+
+    return slots
+}
+
+function formatTime(date: Date) {
+    return date.toTimeString().slice(0, 5) // "HH:MM"
 }

@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/db"
-import { eq, and } from "drizzle-orm"
-import { services, clinicSchedules, clinics, campaignSettings, reviews } from "@/db/schema"
+import { eq, desc, and, gte, lte } from "drizzle-orm"
+import { services, clinicSchedules, clinics, campaignSettings, reviews, appointments, intakeQuestions } from "@/db/schema"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -217,6 +217,32 @@ export async function processFeedback(id: string, action: 'approve' | 'reject') 
     await checkAdmin()
     await db.update(reviews).set({ status: action === 'approve' ? 'approved' : 'rejected' }).where(eq(reviews.id, id))
     revalidatePath("/admin/reputation")
+}
+
+/* Intake Question CRUD */
+export async function createIntakeQuestion(data: { text: string, jsonKey: string, type: string, order?: number }) {
+    await checkAdmin();
+    await db.insert(intakeQuestions).values({
+        id: crypto.randomUUID(),
+        ...data,
+        isActive: true
+    });
+    revalidatePath("/admin/form-builder");
+    revalidatePath("/get-my-card");
+}
+
+export async function updateIntakeQuestion(id: string, data: Partial<{ text: string, jsonKey: string, type: string, order: number, isActive: boolean }>) {
+    await checkAdmin();
+    await db.update(intakeQuestions).set(data).where(eq(intakeQuestions.id, id));
+    revalidatePath("/admin/form-builder");
+    revalidatePath("/get-my-card");
+}
+
+export async function deleteIntakeQuestion(id: string) {
+    await checkAdmin();
+    await db.delete(intakeQuestions).where(eq(intakeQuestions.id, id));
+    revalidatePath("/admin/form-builder");
+    revalidatePath("/get-my-card");
 }
 
 export async function autoTagReview(id: string, text: string) {

@@ -15,10 +15,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { cn } from "@/lib/utils"
 import { CalendarIcon, Mic, Loader2 } from "lucide-react"
-import { createAppointment } from "./actions"
+import { createAppointment, getAvailableSlots } from "./actions"
 import { toast } from "sonner"
 import { InputMask } from "@react-input/mask"
 import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 
 const formSchema = z.object({
     answers: z.record(z.string(), z.any()).optional(),
@@ -41,6 +42,8 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
     const [bookingStage, setBookingStage] = useState<'intake' | 'time' | 'review'>('intake')
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [availableSlots, setAvailableSlots] = useState<string[]>([])
+    const [isLoadingSlots, setIsLoadingSlots] = useState(false)
 
     const router = useRouter()
     const form = useForm<z.infer<typeof formSchema>>({
@@ -98,6 +101,24 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
     const baseService = clinic.services.find(s => !s.isUpsell)
     const upsellService = clinic.services.find(s => s.isUpsell)
 
+    useEffect(() => {
+        if (selectedDate && baseService) {
+            const fetchSlots = async () => {
+                setIsLoadingSlots(true)
+                try {
+                    const slots = await getAvailableSlots(clinic.id, selectedDate, baseService.duration)
+                    setAvailableSlots(slots)
+                } catch (e) {
+                    console.error(e)
+                    toast.error("Failed to load available times")
+                } finally {
+                    setIsLoadingSlots(false)
+                }
+            }
+            fetchSlots()
+        }
+    }, [selectedDate, clinic.id, baseService?.duration])
+
     const handleIntakeSubmit = async () => {
         const isValid = await form.trigger(["firstName", "lastName", "email", "phone"])
         if (!isValid) {
@@ -154,7 +175,7 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
         }
     }
 
-    const slots = ["09:00", "09:30", "10:00", "10:30", "11:00"] // Mock
+    const slots = availableSlots
 
     return (
         <div className="space-y-6">
@@ -260,11 +281,21 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                         className="rounded-md border mx-auto"
                     />
                     <div className="grid grid-cols-3 gap-2">
-                        {slots.map(time => (
-                            <Button key={time} variant="outline" onClick={() => handleTimeSelect(time)}>
-                                {time}
-                            </Button>
-                        ))}
+                        {isLoadingSlots ? (
+                            <div className="col-span-3 flex justify-center py-8">
+                                <Loader2 className="animate-spin h-6 w-6 text-emerald-600" />
+                            </div>
+                        ) : slots.length > 0 ? (
+                            slots.map(time => (
+                                <Button key={time} variant="outline" onClick={() => handleTimeSelect(time)} className="h-12 border-emerald-100 hover:border-emerald-500 hover:bg-emerald-50">
+                                    {time}
+                                </Button>
+                            ))
+                        ) : (
+                            <div className="col-span-3 text-center py-8 bg-zinc-50 rounded-lg border border-dashed">
+                                <p className="text-sm text-muted-foreground">No availability found for this date.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

@@ -34,12 +34,20 @@ export default async function LocationPage({ params }: { params: { slug: string 
             </div>
 
             {!clinic.isActive ? (
-                <Card className="max-w-md w-full border-yellow-500/50 bg-yellow-500/5">
+                <Card className="max-w-md w-full border-emerald-100 bg-emerald-50/30 shadow-sm">
                     <CardHeader>
-                        <CardTitle className="text-yellow-600 text-center">Coming Soon</CardTitle>
+                        <CardTitle className="text-emerald-800 text-center flex flex-col items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            Coming Soon
+                        </CardTitle>
                     </CardHeader>
-                    <CardContent className="text-center font-medium">
-                        Opening {clinic.openDate ? new Date(clinic.openDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long' }) : 'Soon'}
+                    <CardContent className="text-center space-y-4">
+                        <p className="text-emerald-900/70 font-medium">
+                            We are currently preparing this location to serve the local trucking community.
+                        </p>
+                        <div className="p-3 bg-white rounded-lg border border-emerald-100 font-bold text-emerald-600">
+                            Targeting: {clinic.openDate ? new Date(clinic.openDate).toLocaleDateString(undefined, { year: 'numeric', month: 'long' }) : 'Fall 2026'}
+                        </div>
                     </CardContent>
                 </Card>
             ) : (
@@ -60,7 +68,7 @@ export default async function LocationPage({ params }: { params: { slug: string 
                         <CalendarClock className="h-5 w-5" /> Hours
                     </h3>
                     <div className="space-y-2 border rounded-lg p-4 bg-card">
-                        {clinic.schedules.sort((a, b) => a.dayOfWeek - b.dayOfWeek).map(s => (
+                        {clinic.schedules.sort((a: any, b: any) => a.dayOfWeek - b.dayOfWeek).map((s: any) => (
                             <div key={s.id} className="flex justify-between text-sm">
                                 <span className="font-medium">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][s.dayOfWeek]}</span>
                                 <span>{s.isActive ? `${s.openTime} - ${s.closeTime}` : 'Closed'}</span>

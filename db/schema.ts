@@ -99,6 +99,7 @@ export const clinics = pgTable("clinic", {
     doctorEmail: text("doctorEmail"),
     doctorType: text("doctorType"),
     additionalInfo: json("additionalInfo"),
+    heroIntro: json("heroIntro"),
 
     // Twilio + SendGrid Integration
     twilioSid: text("twilioSid"),
@@ -128,6 +129,7 @@ export const services = pgTable("service", {
     clinicId: text("clinicId")
         .notNull()
         .references(() => clinics.id),
+    intakeFormId: text("intakeFormId").references(() => intakeForms.id),
     name: text("name").notNull(),
     description: text("description"),
     price: decimal("price").notNull(),
@@ -138,11 +140,23 @@ export const services = pgTable("service", {
     type: text("type").default("walkin").notNull(), // 'walkin' or 'reserved'
 });
 
+export const intakeForms = pgTable("intakeForm", {
+    id: text("id").primaryKey(),
+    clinicId: text("clinicId")
+        .references(() => clinics.id),
+    name: text("name").notNull(),
+    description: text("description"),
+    isActive: boolean("isActive").default(true).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+});
+
 export const intakeQuestions = pgTable("intakeQuestion", {
     id: text("id").primaryKey(),
+    formId: text("formId").references(() => intakeForms.id, { onDelete: "cascade" }),
     text: text("text").notNull(),
-    jsonKey: text("jsonKey").notNull().unique(),
+    jsonKey: text("jsonKey").notNull(),
     type: text("type").notNull(),
+    options: json("options"), // Array of string
     isActive: boolean("isActive").default(true).notNull(),
     order: integer("order").default(0).notNull(),
 });
@@ -256,6 +270,7 @@ export const clinicsRelations = relations(clinics, ({ many }) => ({
     services: many(services),
     appointments: many(appointments),
     campaignSettings: many(campaignSettings),
+    intakeForms: many(intakeForms),
 }));
 
 export const clinicSchedulesRelations = relations(
@@ -273,7 +288,23 @@ export const servicesRelations = relations(services, ({ one, many }) => ({
         fields: [services.clinicId],
         references: [clinics.id],
     }),
+    intakeForm: one(intakeForms, {
+        fields: [services.intakeFormId],
+        references: [intakeForms.id],
+    }),
     appointments: many(appointmentServices),
+}));
+
+export const intakeFormsRelations = relations(intakeForms, ({ many }) => ({
+    questions: many(intakeQuestions),
+    services: many(services),
+}));
+
+export const intakeQuestionsRelations = relations(intakeQuestions, ({ one }) => ({
+    form: one(intakeForms, {
+        fields: [intakeQuestions.formId],
+        references: [intakeForms.id],
+    }),
 }));
 
 export const appointmentsRelations = relations(

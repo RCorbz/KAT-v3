@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef } from "react"
-import { updateService, updateSchedule, createClinic, updateClinic, createService, deleteService, createSchedule, deleteSchedule, updateClinicDoctorInfo } from "../actions"
+import { updateSchedule, createClinic, updateClinic, createSchedule, deleteSchedule, updateClinicDoctorInfo } from "../actions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Trash2, PlusCircle, Building2, UserCircle, MapPin, Briefcase, Clock, Plus } from "lucide-react"
+import { Trash2, PlusCircle, Building2, UserCircle, MapPin, Clock, Plus } from "lucide-react"
 
 const US_STATES = [
     "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
@@ -170,7 +170,7 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                             <TabsList className="bg-zinc-200/50 h-auto p-1 inline-flex w-full md:w-auto overflow-x-auto whitespace-nowrap">
                                 <TabsTrigger value="address" className="px-4 py-2 text-xs md:text-sm flex items-center gap-1.5"><MapPin className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Location & Address</span><span className="sm:hidden">Location</span></TabsTrigger>
                                 <TabsTrigger value="doctor" className="px-4 py-2 text-xs md:text-sm flex items-center gap-1.5"><UserCircle className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Doctor Profile</span><span className="sm:hidden">Doctor</span></TabsTrigger>
-                                <TabsTrigger value="services" className="px-4 py-2 text-xs md:text-sm flex items-center gap-1.5"><Briefcase className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Services & Pricing</span><span className="sm:hidden">Services</span></TabsTrigger>
+
                                 <TabsTrigger value="schedules" className="px-4 py-2 text-xs md:text-sm flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> <span className="hidden sm:inline">Operating Hours</span><span className="sm:hidden">Hours</span></TabsTrigger>
                             </TabsList>
                         </div>
@@ -322,72 +322,6 @@ export function OperationsClient({ clinics }: { clinics: Clinic[] }) {
                                 </form>
                             </TabsContent>
 
-                            {/* SERVICES */}
-                            <TabsContent value="services" className="m-0 space-y-6">
-                                <div>
-                                    <h3 className="text-xl font-semibold">Services & Product Upsells</h3>
-                                    <p className="text-sm text-muted-foreground">Manage the active billable services mapped to this specific clinic.</p>
-                                </div>
-
-                                <form action={async (formData) => {
-                                    await createService({
-                                        clinicId: activeClinic.id,
-                                        name: formData.get("name") as string,
-                                        price: Number(formData.get("price")),
-                                        duration: Number(formData.get("duration")),
-                                        isUpsell: formData.get("isUpsell") === "on"
-                                    })
-                                }} className="flex flex-col md:flex-row items-end gap-3 bg-zinc-50 p-6 rounded-xl border border-dashed shadow-inner">
-                                    <div className="w-full md:flex-1 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">New Service Target</Label><Input name="name" placeholder="e.g. Drug Screen" required className="bg-white" /></div>
-                                    <div className="w-full md:w-28 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Price ($)</Label><Input name="price" type="number" step="0.01" required className="bg-white" /></div>
-                                    <div className="w-full md:w-24 space-y-1.5"><Label className="text-xs font-semibold text-zinc-500 uppercase">Minutes</Label><Input name="duration" type="number" required className="bg-white" /></div>
-                                    <div className="w-full md:w-auto flex items-center justify-between md:flex-col gap-2 p-3 border rounded-md bg-white">
-                                        <Label className="text-[10px] uppercase text-zinc-400 font-bold whitespace-nowrap">Check-out Upsell?</Label>
-                                        <Switch name="isUpsell" />
-                                    </div>
-                                    <Button type="submit" className="w-full md:w-auto bg-zinc-900 h-12 px-6"><PlusCircle className="w-4 h-4 mr-2" /> Add Record</Button>
-                                </form>
-
-                                <div className="space-y-0 rounded-xl border overflow-hidden shadow-sm">
-                                    {activeClinic.services.map((service: any, idx: number) => (
-                                        <div key={service.id} className={`flex flex-col md:flex-row md:items-center gap-4 p-5 ${idx !== 0 ? 'border-t' : ''} bg-white hover:bg-zinc-50/50 transition-colors`}>
-                                            <form action={async (formData) => {
-                                                await updateService(service.id, {
-                                                    price: Number(formData.get("price")),
-                                                    duration: Number(formData.get("duration"))
-                                                })
-                                            }} className="flex-1 grid grid-cols-1 md:grid-cols-4 items-end gap-4">
-                                                <div className="md:col-span-2 space-y-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <Label className="text-lg font-medium">{service.name}</Label>
-                                                        {service.isUpsell && <span className="text-[10px] h-5 font-bold uppercase tracking-wider bg-blue-50 text-blue-600 border border-blue-100 px-2 flex items-center rounded-full">Upsell</span>}
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <Label className="text-[10px] uppercase font-bold text-zinc-400">Price</Label>
-                                                    <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">$</span>
-                                                        <Input name="price" defaultValue={String(service.price)} type="number" step="0.01" className="h-10 pl-7" />
-                                                    </div>
-                                                </div>
-                                                <div className="flex gap-2 items-end">
-                                                    <div className="flex-1 space-y-1">
-                                                        <Label className="text-[10px] uppercase font-bold text-zinc-400">Mins</Label>
-                                                        <Input name="duration" defaultValue={service.duration} type="number" className="h-10" />
-                                                    </div>
-                                                    <Button type="submit" size="sm" variant="outline" className="h-10 px-4">Update</Button>
-                                                </div>
-                                            </form>
-                                            <form action={async () => {
-                                                await deleteService(service.id)
-                                            }}>
-                                                <Button type="submit" size="icon" variant="ghost" className="h-10 w-10 text-zinc-300 hover:text-red-500 hover:bg-red-50"><Trash2 className="w-5 h-5" /></Button>
-                                            </form>
-                                        </div>
-                                    ))}
-                                    {activeClinic.services.length === 0 && <div className="p-12 text-center text-sm text-muted-foreground bg-zinc-50/20 italic">No service records provisioned yet.</div>}
-                                </div>
-                            </TabsContent>
 
                             {/* SCHEDULES */}
                             <TabsContent value="schedules" className="m-0 space-y-6">

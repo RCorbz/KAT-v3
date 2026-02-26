@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { format, addWeeks, startOfDay, endOfDay } from "date-fns"
 import { ClinicSettingsManager } from "./ClinicSettingsManager"
+import { HeroIntroManager } from "./HeroIntroManager"
 import { clinics } from "@/db/schema"
 
 export const dynamic = 'force-dynamic'
@@ -222,19 +223,10 @@ async function getRetentionMetrics() {
     };
 }
 
-import { ServicesManager } from "./ServicesManager"
-
 export default async function AdminDashboard() {
     const headquarterClinic = await db.query.clinics.findFirst({
         where: eq(clinics.slug, "weatherford-tx") // Using the main clinic for now
     })
-
-    let allServices: any[] = []
-    if (headquarterClinic) {
-        allServices = await db.query.services.findMany({
-            where: eq(services.clinicId, headquarterClinic.id)
-        })
-    }
 
     const aov = await getSquareAOV()
     const sentiment = await getSentimentMetrics()
@@ -264,12 +256,11 @@ export default async function AdminDashboard() {
                     <ClinicSettingsManager
                         clinicId={headquarterClinic.id}
                         initialWaitTime={headquarterClinic.estimatedWaitMinutes || 0}
-                        initialWalkInPrice={headquarterClinic.walkInPrice || "125.00"}
-                        initialReservedPrice={headquarterClinic.reservedPrice || "99.00"}
                     />
-                    <ServicesManager
+                    <HeroIntroManager
+                        key={JSON.stringify(headquarterClinic.heroIntro)}
                         clinicId={headquarterClinic.id}
-                        initialServices={allServices}
+                        initialData={(headquarterClinic.heroIntro as any) || {}}
                     />
                 </div>
             )}

@@ -7,8 +7,8 @@ import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 
 export async function createAppointment(formData: any) {
-    // formData contains: answers, date, timeSlot, upsellAccepted, userDetails
-    const { answers, date, timeSlot, upsellAccepted, userDetails, clinicId } = formData
+    // formData contains: answers, date, timeSlot, upsellAccepted, userDetails, clinicId, serviceId
+    const { answers, date, timeSlot, upsellAccepted, userDetails, clinicId, serviceId } = formData
 
     // 1. Find or Create User
     const existingUsers = await db.select().from(users).where(eq(users.email, userDetails.email))
@@ -40,7 +40,9 @@ export async function createAppointment(formData: any) {
 
     const clinicServices = await db.select().from(servicesSchema).where(eq(servicesSchema.clinicId, clinicId))
 
-    const baseService = clinicServices.find(s => !s.isUpsell)
+    const baseService = serviceId
+        ? clinicServices.find(s => s.id === serviceId)
+        : clinicServices.find(s => !s.isUpsell)
     const upsellService = clinicServices.find(s => s.isUpsell)
 
     const servicesToConnect = []

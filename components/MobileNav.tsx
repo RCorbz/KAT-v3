@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Home, IdCard, ShieldCheck } from "lucide-react"
+import { Home, FileText, Stethoscope } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export function MobileNav() {
@@ -10,8 +10,8 @@ export function MobileNav() {
 
     const links = [
         { href: "/", label: "Home", icon: Home },
-        { href: "/get-my-card", label: "Get My Card", icon: IdCard, primary: true },
-        { href: "/admin", label: "Admin", icon: ShieldCheck },
+        { href: "/get-my-card", label: "Driver Records", icon: FileText, primary: true },
+        { href: "/admin", label: "Doc's Office", icon: Stethoscope },
     ]
 
     return (

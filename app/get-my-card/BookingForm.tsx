@@ -33,10 +33,10 @@ const formSchema = z.object({
 })
 
 type Question = { id: string; text: string; jsonKey: string; type: string }
-type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string | null }
+type Service = { id: string; name: string; price: any; duration: number; isUpsell: boolean; description?: string | null; type: string }
 type Clinic = { id: string; services: Service[]; schedules: any[] }
 
-export function BookingForm({ questions, clinic }: { questions: Question[], clinic: Clinic }) {
+export function BookingForm({ questions, clinic, initialServiceId }: { questions: Question[], clinic: Clinic, initialServiceId?: string }) {
     const [isRecording, setIsRecording] = useState(false)
     const [showUpsell, setShowUpsell] = useState(false)
     const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
@@ -98,7 +98,9 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
         }
     }
 
-    const baseService = clinic.services.find(s => !s.isUpsell)
+    const baseService = initialServiceId
+        ? clinic.services.find(s => s.id === initialServiceId)
+        : clinic.services.find(s => !s.isUpsell)
     const upsellService = clinic.services.find(s => s.isUpsell)
 
     useEffect(() => {
@@ -157,7 +159,8 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                 email: vals.email,
                 phone: vals.phone
             },
-            clinicId: clinic.id
+            clinicId: clinic.id,
+            serviceId: baseService?.id
         }
 
         try {
@@ -211,16 +214,15 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                                             onClick={() => form.setValue(`answers.${q.jsonKey}` as any, false)}
                                         >No</Button>
                                     </div>
-                                ) : q.type === 'select' && q.jsonKey === 'howDidYouHear' ? (
+                                ) : q.type === 'select' ? (
                                     <select
                                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                                         {...form.register(`answers.${q.jsonKey}` as any)}
                                     >
                                         <option value="">Select an option...</option>
-                                        <option value="Online Search">Online Search</option>
-                                        <option value="Ads / Social Media">Ads / Social Media</option>
-                                        <option value="Referral">Referral</option>
-                                        <option value="Other">Other</option>
+                                        {(q as any).options?.map((opt: string) => (
+                                            <option key={opt} value={opt}>{opt}</option>
+                                        ))}
                                     </select>
                                 ) : (
                                     <Input
@@ -308,9 +310,11 @@ export function BookingForm({ questions, clinic }: { questions: Question[], clin
                             <div className="flex justify-between items-center pb-4 border-b border-blue-100">
                                 <div>
                                     <p className="font-bold text-blue-900">{baseService?.name}</p>
-                                    <p className="text-xs text-blue-600">Reserved Discount Applied</p>
+                                    {baseService?.type === 'reserved' && (
+                                        <p className="text-xs text-blue-600">Reserved Discount Applied</p>
+                                    )}
                                 </div>
-                                <p className="text-xl font-black text-blue-900">${(clinic as any).reservedPrice || "99"}</p>
+                                <p className="text-xl font-black text-blue-900">${baseService?.price ? Number(baseService.price).toFixed(2).replace(/\.00$/, '') : "99"}</p>
                             </div>
 
                             {form.watch("upsellAccepted") && (

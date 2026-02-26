@@ -14,6 +14,7 @@ import { toast } from "sonner"
 type Service = {
     id: string
     clinicId: string
+    intakeFormId: string | null
     name: string
     description: string | null
     price: string
@@ -24,7 +25,7 @@ type Service = {
     type: string
 }
 
-export function ServicesManager({ clinicId, initialServices }: { clinicId: string; initialServices: Service[] }) {
+export function ServicesManager({ clinicId, initialServices, forms }: { clinicId: string; initialServices: Service[]; forms: any[] }) {
     const [services, setServices] = useState<Service[]>(initialServices.sort((a, b) => a.order - b.order))
     const [isSaving, setIsSaving] = useState(false)
 
@@ -42,8 +43,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                 type: 'walkin'
             })
             toast.success("Service created")
-            // In a real app we'd refresh the data here, or let the server action revalidatePath handle it if wrapped in a transition.
-            // For immediate local feedback, reloading is safest if not using transitions.
             window.location.reload()
         } catch (e) {
             toast.error("Failed to create service")
@@ -53,7 +52,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
     }
 
     const handleUpdate = async (id: string, updates: Partial<Service>) => {
-        // Optimistic UI update
         setServices(current => current.map(s => s.id === id ? { ...s, ...updates } : s))
 
         try {
@@ -62,7 +60,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                 description: updates.description === null ? undefined : updates.description,
                 price: updates.price ? parseFloat(updates.price) : undefined
             })
-            // Rely on revalidatePath
         } catch (e) {
             toast.error("Failed to update service")
         }
@@ -82,7 +79,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
         }
     }
 
-    // Split services for UI clarity
     const mainServices = services.filter(s => !s.isUpsell).sort((a, b) => a.order - b.order)
     const addonServices = services.filter(s => s.isUpsell).sort((a, b) => a.order - b.order)
 
@@ -113,7 +109,7 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                     </div>
 
                     {/* Column 2: Pricing & Timing */}
-                    <div className="space-y-4 lg:col-span-2">
+                    <div className="space-y-4 lg:col-span-1">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
                                 <label className="text-xs font-semibold text-zinc-500">Price ($)</label>
@@ -133,19 +129,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                             </div>
                         </div>
                         <div>
-                            <label className="text-xs font-semibold text-zinc-500">Homepage Description (Marketing Hook)</label>
-                            <Textarea
-                                value={s.description || ""}
-                                onChange={(e) => handleUpdate(s.id, { description: e.target.value })}
-                                placeholder="e.g. Requires ~30 mins + $125. Walk-in anytime."
-                                className="h-20 resize-none"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Column 3: Routing & Display Order */}
-                    <div className="space-y-4">
-                        <div>
                             <label className="text-xs font-semibold text-zinc-500">CTA Flow Type</label>
                             <Select value={s.type} onValueChange={(val) => handleUpdate(s.id, { type: val })}>
                                 <SelectTrigger>
@@ -157,6 +140,38 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                                 </SelectContent>
                             </Select>
                         </div>
+                    </div>
+
+                    {/* Column 3: Description */}
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-semibold text-zinc-500">Homepage Description (Hook)</label>
+                            <Textarea
+                                value={s.description || ""}
+                                onChange={(e) => handleUpdate(s.id, { description: e.target.value })}
+                                placeholder="e.g. Requires ~30 mins..."
+                                className="h-20 resize-none text-xs"
+                            />
+                        </div>
+                    </div>
+
+                    {/* Column 4: Routing & Form Attachment */}
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-semibold text-zinc-500">Attached Intake Form</label>
+                            <Select value={s.intakeFormId || "none"} onValueChange={(val) => handleUpdate(s.id, { intakeFormId: val === "none" ? null : val })}>
+                                <SelectTrigger className="bg-zinc-50 border-emerald-100">
+                                    <SelectValue placeholder="Select a form..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">No Form Attached</SelectItem>
+                                    {forms.map(f => (
+                                        <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <p className="text-[10px] text-zinc-400 mt-1 italic">Forms can be created in "Intake Form" builder.</p>
+                        </div>
                         <div>
                             <label className="text-xs font-semibold text-zinc-500">Sort Order</label>
                             <Input
@@ -164,7 +179,6 @@ export function ServicesManager({ clinicId, initialServices }: { clinicId: strin
                                 value={s.order || 0}
                                 onChange={(e) => handleUpdate(s.id, { order: parseInt(e.target.value) || 0 })}
                             />
-                            <p className="text-[10px] text-zinc-400 mt-1">Lower numbers appear first.</p>
                         </div>
                     </div>
 

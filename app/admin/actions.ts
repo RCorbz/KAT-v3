@@ -2,7 +2,7 @@
 
 import { db } from "@/db"
 import { eq, desc, and, gte, lte } from "drizzle-orm"
-import { services, clinicSchedules, clinics, campaignSettings, reviews, appointments, intakeQuestions } from "@/db/schema"
+import { services, clinicSchedules, clinics, campaignSettings, reviews, appointments, intakeQuestions, intakeForms } from "@/db/schema"
 import { revalidatePath } from "next/cache"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
@@ -15,7 +15,7 @@ const checkAdmin = async () => {
     }
 }
 
-export async function updateService(id: string, data: { name?: string, description?: string, price?: number, duration?: number, isUpsell?: boolean, showOnHomepage?: boolean, order?: number, type?: string }) {
+export async function updateService(id: string, data: { name?: string, description?: string, price?: number, duration?: number, isUpsell?: boolean, showOnHomepage?: boolean, order?: number, type?: string, intakeFormId?: string | null }) {
     await checkAdmin()
 
     const updateData: any = {}
@@ -27,6 +27,7 @@ export async function updateService(id: string, data: { name?: string, descripti
     if (data.showOnHomepage !== undefined) updateData.showOnHomepage = data.showOnHomepage
     if (data.order !== undefined) updateData.order = data.order
     if (data.type !== undefined) updateData.type = data.type
+    if (data.intakeFormId !== undefined) updateData.intakeFormId = data.intakeFormId
 
     await db.update(services).set(updateData).where(eq(services.id, id))
     revalidatePath("/admin")
@@ -85,7 +86,7 @@ export async function updateClinicDoctorInfo(id: string, data: { doctorName?: st
     revalidatePath("/admin/operations")
 }
 
-export async function createService(data: { clinicId: string, name: string, description?: string, price: number, duration: number, isUpsell: boolean, showOnHomepage?: boolean, order?: number, type?: string }) {
+export async function createService(data: { clinicId: string, name: string, description?: string, price: number, duration: number, isUpsell: boolean, showOnHomepage?: boolean, order?: number, type?: string, intakeFormId?: string }) {
     await checkAdmin()
     await db.insert(services).values({
         id: crypto.randomUUID(),
@@ -97,7 +98,8 @@ export async function createService(data: { clinicId: string, name: string, desc
         isUpsell: data.isUpsell,
         showOnHomepage: data.showOnHomepage ?? true,
         order: data.order ?? 0,
-        type: data.type ?? 'walkin'
+        type: data.type ?? 'walkin',
+        intakeFormId: data.intakeFormId || null
     })
     revalidatePath("/admin")
     revalidatePath("/")
@@ -234,21 +236,61 @@ export async function processFeedback(id: string, action: 'approve' | 'reject') 
     revalidatePath("/admin/reputation")
 }
 
-/* Intake Question CRUD */
-export async function createIntakeQuestion(data: { text: string, jsonKey: string, type: string, order?: number }) {
+/* Intake Form CRUD */
+export async function createIntakeForm(data: { name: string, description?: string, clinicId?: string }) {
     await checkAdmin();
+    const id = crypto.randomUUID();
+    await db.insert(intakeForms).values({
+        id,
+        ...data,
+        isActive: true
+    });
+    revalidatePath("/admin/form-builder");
+    return id;
+}
+
+export async function updateIntakeForm(id: string, data: Partial<{ name: string, description: string, isActive: boolean }>) {
+    await checkAdmin();
+    await db.update(intakeForms).set(data).where(eq(intakeForms.id, id));
+    revalidatePath("/admin/form-builder");
+}
+
+export async function deleteIntakeForm(id: string) {
+    await checkAdmin();
+    await db.delete(intakeForms).where(eq(intakeForms.id, id));
+    revalidatePath("/admin/form-builder");
+}
+
+function toCamelCase(str: string) {
+    return str
+        .replace(/(?:^\w|[A-Z]|\b\w)/g, (word, index) => {
+            return index === 0 ? word.toLowerCase() : word.toUpperCase();
+        })
+        .replace(/\s+/g, '')
+        .replace(/[^\w]/g, '');
+}
+
+/* Intake Question CRUD */
+export async function createIntakeQuestion(data: { formId: string, text: string, type: string, order?: number, options?: any, jsonKey?: string }) {
+    await checkAdmin();
+    const jsonKey = data.jsonKey || toCamelCase(data.text);
     await db.insert(intakeQuestions).values({
         id: crypto.randomUUID(),
         ...data,
+        jsonKey,
         isActive: true
     });
     revalidatePath("/admin/form-builder");
     revalidatePath("/get-my-card");
 }
 
-export async function updateIntakeQuestion(id: string, data: Partial<{ text: string, jsonKey: string, type: string, order: number, isActive: boolean }>) {
+export async function updateIntakeQuestion(id: string, data: Partial<{ text: string, jsonKey: string, type: string, order: number, isActive: boolean, options: any }>) {
     await checkAdmin();
-    await db.update(intakeQuestions).set(data).where(eq(intakeQuestions.id, id));
+    const updateData = { ...data };
+    if (updateData.text && !updateData.jsonKey) {
+        updateData.jsonKey = toCamelCase(updateData.text);
+    }
+    await db.update(intakeQuestions).set(updateData).where(eq(intakeQuestions.id, id));
     revalidatePath("/admin/form-builder");
     revalidatePath("/get-my-card");
 }
@@ -293,6 +335,23 @@ export async function updateClinicSettings(clinicId: string, data: { estimatedWa
         return { success: true };
     } catch (e: any) {
         console.error("Failed to update clinic settings:", e);
+        return { error: e.message };
+    }
+}
+
+export async function updateHeroIntro(clinicId: string, data: { docBio?: string, mapUrl?: string, servicesSummary?: string }) {
+    await checkAdmin();
+    try {
+        await db.update(clinics)
+            .set({
+                heroIntro: data
+            })
+            .where(eq(clinics.id, clinicId));
+
+        revalidatePath('/');
+        revalidatePath('/admin');
+        return { success: true };
+    } catch (e: any) {
         return { error: e.message };
     }
 }
